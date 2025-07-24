@@ -1,142 +1,136 @@
-import logging
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
-from datetime import datetime, timedelta
+import logging import json import os from datetime import datetime, timedelta from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# تنظیمات لاگ
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+-------------------- ذخیره اطلاعات کاربران --------------------
 
-# دیتا موقت
-user_data = {}
+USER_DATA_FILE = "users.json"
 
-# توکن ربات
-TOKEN = "7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc"
+if os.path.exists(USER_DATA_FILE): with open(USER_DATA_FILE, "r") as f: users_data = json.load(f) else: users_data = {}
 
-# منوی اصلی
-def get_main_menu():
-    keyboard = [
-        [InlineKeyboardButton("Balance💰", callback_data='balance')],
-        [InlineKeyboardButton("My Profile👤", callback_data='profile')],
-        [InlineKeyboardButton("Referral Link👥", callback_data='referral')],
-        [InlineKeyboardButton("NFT Withdrawal📤", callback_data='withdraw')],
-        [InlineKeyboardButton("Deposit📥", callback_data='deposit')],
-        [InlineKeyboardButton("Daily bonus🎁", callback_data='bonus')]
-    ]
-    return InlineKeyboardMarkup(keyboard)
+def save_users_data(): with open(USER_DATA_FILE, "w") as f: json.dump(users_data, f, indent=4)
 
-# دکمه برگشت
-def get_back_button():
-    return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to menu", callback_data='menu')]])
+-------------------- تنظیمات اولیه --------------------
 
-# پیام شروع
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    uid = user.id
+logging.basicConfig(level=logging.INFO) TOKEN = "7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc" BONUS_AMOUNT = 0.5 NFT_OPTIONS = [ ("Golden Pepe (15 TON)", 15), ("Silver Pepe (22 TON)", 22), ("Diamond Pepe (35 TON)", 35), ("Platinum Pepe (50 TON)", 50), ("King Pepe (100 TON)", 100), ]
 
-    if uid not in user_data:
-        user_data[uid] = {
-            "name": user.full_name,
-            "start_date": datetime.now(),
-            "referrals": 0,
-            "withdrawals": 0,
-            "deposits": 0,
-            "balance": 0.0,
-            "last_bonus": None
-        }
+-------------------- دکمه های منو --------------------
 
-    await update.message.reply_text(
-        "Welcome to @PlushNFTbot\n\nPlease choose one of the options below:",
-        reply_markup=get_main_menu()
+def get_main_keyboard(): keyboard = [ [InlineKeyboardButton("Balance💰", callback_data="balance")], [InlineKeyboardButton("My Profile👤", callback_data="profile")], [InlineKeyboardButton("Referral Link👥", callback_data="referral")], [InlineKeyboardButton("NFT Withdrawal📤", callback_data="withdrawal")], [InlineKeyboardButton("Deposit📥", callback_data="deposit")], [InlineKeyboardButton("Daily bonus🎁", callback_data="bonus")], ] return InlineKeyboardMarkup(keyboard)
+
+-------------------- شروع ربات --------------------
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE): user = update.effective_user user_id = str(user.id) if user_id not in users_data: users_data[user_id] = { "balance": 0.0, "referrals": [], "start_date": datetime.now().strftime("%Y-%m-%d %H:%M"), "name": user.username or user.first_name, "withdrawals": 0, "deposits": 0, "last_bonus": "" } save_users_data() text = "Welcome to @PlushNFTbot\n\nPlease choose one of the options below." await update.message.reply_text(text, reply_markup=get_main_keyboard())
+
+-------------------- مدیریت کلید ها --------------------
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): query = update.callback_query await query.answer() user_id = str(query.from_user.id) user_data = users_data.get(user_id, {})
+
+def back_button():
+    return [[InlineKeyboardButton("🔙 Back to menu", callback_data="back")]]
+
+if query.data == "back":
+    await query.edit_message_text(
+        text="Welcome to @PlushNFTbot\n\nPlease choose one of the options below.",
+        reply_markup=get_main_keyboard()
     )
+    return
 
-# هندلر دکمه‌ها
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    uid = query.from_user.id
+if query.data == "balance":
+    text = f"Your balance: {user_data.get('balance', 0)} TON"
+    markup = InlineKeyboardMarkup(back_button())
 
-    if uid not in user_data:
-        await query.edit_message_text("Please use /start first.")
-        return
+elif query.data == "profile":
+    text = (
+        f"Your ID: {query.from_user.id}\n"
+        f"Username: @{query.from_user.username or query.from_user.first_name}\n"
+        f"Start date: {user_data.get('start_date', '-') }\n"
+        f"Referrals: {len(user_data.get('referrals', []))}\n"
+        f"Withdrawals: {user_data.get('withdrawals', 0)}\n"
+        f"Deposits: {user_data.get('deposits', 0)}"
+    )
+    markup = InlineKeyboardMarkup(back_button())
 
-    data = query.data
+elif query.data == "referral":
+    ref_link = f"https://t.me/PlushNFTbot?start={user_id}"
+    text = f"Your referral link:\n{ref_link}"
+    markup = InlineKeyboardMarkup(back_button())
 
-    if data == 'menu':
-        await query.edit_message_text(
-            "Welcome to @PlushNFTbot\n\nPlease choose one of the options below:",
-            reply_markup=get_main_menu()
-        )
-    elif data == 'balance':
-        balance = user_data[uid]["balance"]
-        await query.edit_message_text(
-            f"💰 Your current balance: {balance:.2f} TON",
-            reply_markup=get_back_button()
-        )
-    elif data == 'profile':
-        u = user_data[uid]
-        await query.edit_message_text(
-            f"👤 Profile Info:\n"
-            f"🆔 User ID: {uid}\n"
-            f"👤 Name: {u['name']}\n"
-            f"📅 Started: {u['start_date'].strftime('%Y-%m-%d %H:%M')}\n"
-            f"👥 Referrals: {u['referrals']}\n"
-            f"📤 Withdrawals: {u['withdrawals']}\n"
-            f"📥 Deposits: {u['deposits']}",
-            reply_markup=get_back_button()
-        )
-    elif data == 'referral':
-        link = f"https://t.me/PlushNFTbot?start={uid}"
-        await query.edit_message_text(
-            f"👥 Your referral link:\n{link}",
-            reply_markup=get_back_button()
-        )
-    elif data == 'withdraw':
-        if user_data[uid]["referrals"] < 10:
-            await query.edit_message_text(
-                "❌ You need to invite at least 10 users to make a withdrawal.",
-                reply_markup=get_back_button()
-            )
+elif query.data == "withdrawal":
+    referrals = user_data.get("referrals", [])
+    if len(referrals) < 10:
+        text = "You need to invite at least 10 users to withdraw an NFT."
+        markup = InlineKeyboardMarkup(back_button())
+    else:
+        buttons = [
+            [InlineKeyboardButton(f"{name}", callback_data=f"nft_{price}")]
+            for name, price in NFT_OPTIONS
+            if user_data.get("balance", 0) >= price
+        ]
+        buttons.append([InlineKeyboardButton("🔙 Back to menu", callback_data="back")])
+        if buttons:
+            text = "Choose an NFT to withdraw:"
         else:
-            await query.edit_message_text(
-                "Choose an NFT to withdraw:\n\n"
-                "1️⃣ NFT Bronze - 15 TON\n"
-                "2️⃣ NFT Silver - 22 TON\n"
-                "3️⃣ NFT Gold - 35 TON\n"
-                "4️⃣ NFT Diamond - 100 TON\n\n"
-                "🚀 Feature coming soon...",
-                reply_markup=get_back_button()
-            )
-    elif data == 'deposit':
-        await query.edit_message_text(
-            "🚧 Deposit feature coming soon...",
-            reply_markup=get_back_button()
-        )
-    elif data == 'bonus':
-        now = datetime.now()
-        last = user_data[uid]["last_bonus"]
-        if not last or (now - last) > timedelta(hours=24):
-            user_data[uid]["balance"] += 0.5
-            user_data[uid]["last_bonus"] = now
-            await query.edit_message_text(
-                "🎁 Daily bonus received! 0.5 TON added to your balance.",
-                reply_markup=get_back_button()
-            )
-        else:
-            remaining = timedelta(hours=24) - (now - last)
-            hours = remaining.seconds // 3600
-            minutes = (remaining.seconds % 3600) // 60
-            await query.edit_message_text(
-                f"⏳ You have already claimed your daily bonus.\n"
-                f"Please wait {hours}h {minutes}m.",
-                reply_markup=get_back_button()
-            )
+            text = "You don't have enough balance for any NFT."
+        markup = InlineKeyboardMarkup(buttons)
 
-# اجرای ربات
-if __name__ == '__main__':
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.run_polling()
+elif query.data.startswith("nft_"):
+    price = float(query.data.split("_")[1])
+    if user_data.get("balance", 0) >= price:
+        user_data["balance"] -= price
+        user_data["withdrawals"] += 1
+        save_users_data()
+        text = "✅ Withdrawal successful! Your NFT will be gifted to your Telegram account within 24 working hours."
+    else:
+        text = "❌ Not enough balance."
+    markup = InlineKeyboardMarkup(back_button())
+
+elif query.data == "deposit":
+    text = "🚧 Deposit feature coming soon..."
+    markup = InlineKeyboardMarkup(back_button())
+
+elif query.data == "bonus":
+    now = datetime.now()
+    last_bonus = user_data.get("last_bonus")
+    if not last_bonus or now - datetime.strptime(last_bonus, "%Y-%m-%d %H:%M:%S") > timedelta(hours=24):
+        user_data["balance"] += BONUS_AMOUNT
+        user_data["last_bonus"] = now.strftime("%Y-%m-%d %H:%M:%S")
+        save_users_data()
+        text = f"🎁 You received your daily bonus of {BONUS_AMOUNT} TON!"
+    else:
+        text = "⏳ You can only claim your daily bonus once every 24 hours."
+    markup = InlineKeyboardMarkup(back_button())
+
+else:
+    text = "Unknown command."
+    markup = get_main_keyboard()
+
+await query.edit_message_text(text=text, reply_markup=markup)
+
+-------------------- هندل کردن لینک دعوت --------------------
+
+async def handle_referral(update: Update, context: ContextTypes.DEFAULT_TYPE): user = update.effective_user args = context.args user_id = str(user.id)
+
+if user_id not in users_data:
+    referrer_id = args[0] if args else None
+    users_data[user_id] = {
+        "balance": 0.0,
+        "referrals": [],
+        "start_date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "name": user.username or user.first_name,
+        "withdrawals": 0,
+        "deposits": 0,
+        "last_bonus": ""
+    }
+    if referrer_id and referrer_id in users_data and user_id not in users_data[referrer_id]["referrals"]:
+        users_data[referrer_id]["referrals"].append(user_id)
+        users_data[referrer_id]["balance"] += 0.5
+    save_users_data()
+
+text = "Welcome to @PlushNFTbot\n\nPlease choose one of the options below."
+await update.message.reply_text(text, reply_markup=get_main_keyboard())
+
+-------------------- اجرای ربات --------------------
+
+app = ApplicationBuilder().token(TOKEN).build() app.add_handler(CommandHandler("start", handle_referral)) app.add_handler(CallbackQueryHandler(handle_callback))
+
+app.run_polling()
+
