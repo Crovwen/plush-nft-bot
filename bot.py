@@ -165,7 +165,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 🚀 دستور اضافه کردن 1 TON به همه کاربران (فقط ادمین)
 async def addtoall(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    admin_ids = ["123456789"]  # شناسه خودت رو اینجا بذار
+    admin_ids = ["5095867558"]  # شناسه خودت رو اینجا بذار
 
     if user_id not in admin_ids:
         await update.message.reply_text("❌ You are not authorized to use this command.")
