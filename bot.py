@@ -165,14 +165,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "nft_withdraw":
         nft_list = (
             "📦 NFT Options:\n"
-            "Desk Calendar#104863 = 1.3 TON\n"
-            "Lol Pop#24488 = 1.3 TON\n"
-            "B-day Candle#98618 = 1.5 TON\n"
-            "Snake Box#48486 = 1.5 TON\n"
-            "Candy Can#19264 = 1.6 TON\n"
-            "Snoop Dogg#299426 = 2 TON\n"
-            "Ginger Cookie#89374 = 18.5 TON\n"
-            "Jester Hat#91301 = 50 TON\n"
+            "Desk Calendar #104863 = 1.3 TON\n💎"
+            "Lol Pop #24488 = 1.3 TON\n💎"
+            "B-day Candle #98618 = 1.5 TON\n💎"
+            "Snake Box #48486 = 1.5 TON\n💎"
+            "Candy Can #19264 = 1.6 TON\n💎"
+            "Snoop Dogg #299426 = 2 TON\n💎"
+            "Ginger Cookie #89374 = 18.5 TON\n💎"
+            "Jester Hat #91301 = 50 TON\n💎"
         )
         buttons = [
             [InlineKeyboardButton(name, callback_data=f"nft_{name}")]
@@ -208,7 +208,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def addtoall(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    admin_ids = ["YOUR_TELEGRAM_ID"]  # Replace with your Telegram ID
+    admin_ids = ["5095867558"]  # Replace with your Telegram ID
 
     if user_id not in admin_ids:
         await update.message.reply_text("❌ You are not authorized to use this command.")
