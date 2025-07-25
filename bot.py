@@ -1,4 +1,3 @@
-
 import logging
 import json
 import os
@@ -10,7 +9,6 @@ from telegram.ext import (
     CallbackQueryHandler,
     ContextTypes,
 )
-
 from flask import Flask
 import threading
 
@@ -26,7 +24,7 @@ def run_web():
 
 threading.Thread(target=run_web).start()
 
-# 🔐 توکن ربات به صورت مستقیم
+# 🔐 توکن ربات
 TOKEN = "7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc"
 DATA_FILE = "users.json"
 
@@ -89,7 +87,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     save_users()
                     await context.bot.send_message(
                         chat_id=int(referrer_id),
-                        text=f"🎉 Your friend ({user_id}) joined the bot via your referral link!"
+                        text=f"🎉 Your friend ({user_id}) joined the bot via your referral link!\n💰 You earned 0.5 TON!"
                     )
 
     await update.message.reply_text(
@@ -123,7 +121,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif query.data == "referral":
         referral_link = f"https://t.me/PlushNFTbot?start={user_id}"
-        await query.edit_message_text(f"🔗 Your referral link:\n{referral_link}", reply_markup=back_button())
+        await query.edit_message_text(
+            f"💸 Invite your friends and earn 0.5 TON for each!\n\n🔗 Your referral link:\n{referral_link}",
+            reply_markup=back_button()
+        )
 
     elif query.data == "withdraw":
         if len(user_data.get("referrals", [])) < 10:
@@ -147,7 +148,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elapsed = now - datetime.fromisoformat(last_bonus)
             if elapsed < timedelta(hours=24):
                 remaining = timedelta(hours=24) - elapsed
-                await query.edit_message_text(f"⏳ You already claimed your daily bonus.\nTry again in {remaining}.", reply_markup=back_button())
+                await query.edit_message_text(
+                    f"⏳ You already claimed your daily bonus.\nTry again in {str(remaining).split('.')[0]}.",
+                    reply_markup=back_button()
+                )
                 return
 
         user_data["balance"] += 0.5
@@ -156,36 +160,28 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_users()
         await query.edit_message_text("🎉 You received 0.5 TON as daily bonus!", reply_markup=back_button())
 
-# ✅ دستور مدیر برای افزودن 1 TON به همه کاربران
-async def add_to_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    ADMIN_ID = 5095867558
-    if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("⛔️ Access denied.")
+# 🚀 دستور اضافه کردن 1 TON به همه کاربران (فقط ادمین)
+async def addtoall(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    admin_ids = ["123456789"]  # شناسه خودت رو اینجا بذار
+
+    if user_id not in admin_ids:
+        await update.message.reply_text("❌ You are not authorized to use this command.")
         return
 
-    count = 0
-    for user_id in users:
-        users[user_id]["balance"] += 1
-        count += 1
-        try:
-            await context.bot.send_message(
-                chat_id=int(user_id),
-                text="🎁 1 TON was added to your balance by the admins."
-            )
-        except:
-            continue
+    for uid in users:
+        users[uid]["balance"] = users[uid].get("balance", 0) + 1
 
     save_users()
-    await update.message.reply_text(f"✅ 1 TON added to {count} users successfully.")
+    await update.message.reply_text("✅ 1 TON added to all users' balances!")
 
 # 🚀 اجرای ربات
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("addtoall", add_to_all))
+    app.add_handler(CommandHandler("addtoall", addtoall))  # اضافه شد
     app.add_handler(CallbackQueryHandler(button_handler))
     app.run_polling()
 
 if __name__ == "__main__":
     main()
- 
