@@ -10,6 +10,22 @@ from telegram.ext import (
     ContextTypes,
 )
 
+from flask import Flask
+import threading
+
+# 🟢 Flask برای روشن نگه داشتن ربات
+web_app = Flask(__name__)
+
+@web_app.route('/')
+def home():
+    return "Bot is alive!"
+
+def run_web():
+    web_app.run(host="0.0.0.0", port=8080)
+
+threading.Thread(target=run_web).start()
+
+# 🔐 توکن ربات به صورت مستقیم
 TOKEN = "7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc"
 DATA_FILE = "users.json"
 
