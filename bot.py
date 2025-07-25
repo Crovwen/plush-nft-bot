@@ -1,3 +1,4 @@
+
 import logging
 import json
 import os
@@ -155,12 +156,36 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_users()
         await query.edit_message_text("🎉 You received 0.5 TON as daily bonus!", reply_markup=back_button())
 
+# ✅ دستور مدیر برای افزودن 1 TON به همه کاربران
+async def add_to_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    ADMIN_ID = 5095867558
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("⛔️ Access denied.")
+        return
+
+    count = 0
+    for user_id in users:
+        users[user_id]["balance"] += 1
+        count += 1
+        try:
+            await context.bot.send_message(
+                chat_id=int(user_id),
+                text="🎁 1 TON was added to your balance by the admins."
+            )
+        except:
+            continue
+
+    save_users()
+    await update.message.reply_text(f"✅ 1 TON added to {count} users successfully.")
+
 # 🚀 اجرای ربات
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("addtoall", add_to_all))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.run_polling()
 
 if __name__ == "__main__":
     main()
+ 
