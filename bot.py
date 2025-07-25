@@ -83,11 +83,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if referrer_id != user_id and referrer_id in users:
                 if user_id not in users[referrer_id]["referrals"]:
                     users[referrer_id]["referrals"].append(user_id)
-                    users[referrer_id]["balance"] += 0.5
+                    users[referrer_id]["balance"] += 0.05
                     save_users()
                     await context.bot.send_message(
                         chat_id=int(referrer_id),
-                        text=f"🎉 Your friend ({user_id}) joined the bot via your referral link!\n💰 You earned 0.5 TON!"
+                        text=f"🎉 Your friend ({user_id}) joined the bot via your referral link!\n💰 You earned 0.05 TON!"
                     )
 
     await update.message.reply_text(
@@ -160,7 +160,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data["last_bonus"] = now.isoformat()
         users[user_id] = user_data
         save_users()
-        await query.edit_message_text("🎉 You received 0.5 TON as your daily bonus!", reply_markup=back_button())
+        await query.edit_message_text("🎉 You received 0.06 TON as your daily bonus!", reply_markup=back_button())
 
 # 🚀 دستور اضافه کردن 1 TON به همه کاربران (فقط ادمین)
 async def addtoall(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -172,10 +172,10 @@ async def addtoall(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     for uid in users:
-        users[uid]["balance"] = users[uid].get("balance", 0) + 1
+        users[uid]["balance"] = users[uid].get("balance", 0) + 0.1
 
     save_users()
-    await update.message.reply_text("✅ 1 TON added to all users' balances!")
+    await update.message.reply_text("✅ 0.1 TON added to all users' balances!")
 
 # 🚀 اجرای ربات
 def main():
