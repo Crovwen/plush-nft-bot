@@ -148,17 +148,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elapsed = now - datetime.fromisoformat(last_bonus)
             if elapsed < timedelta(hours=24):
                 remaining = timedelta(hours=24) - elapsed
+                hours, remainder = divmod(remaining.seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
                 await query.edit_message_text(
-                    f"⏳ You already claimed your daily bonus.\nTry again in {str(remaining).split('.')[0]}.",
+                    f"⏳ You have already claimed your daily bonus.\nPlease try again in {hours}h {minutes}m {seconds}s.",
                     reply_markup=back_button()
                 )
                 return
 
-        user_data["balance"] += 0.5
+        user_data["balance"] = user_data.get("balance", 0) + 0.5
         user_data["last_bonus"] = now.isoformat()
         users[user_id] = user_data
         save_users()
-        await query.edit_message_text("🎉 You received 0.5 TON as daily bonus!", reply_markup=back_button())
+        await query.edit_message_text("🎉 You received 0.5 TON as your daily bonus!", reply_markup=back_button())
 
 # 🚀 دستور اضافه کردن 1 TON به همه کاربران (فقط ادمین)
 async def addtoall(update: Update, context: ContextTypes.DEFAULT_TYPE):
