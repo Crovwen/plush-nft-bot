@@ -14,7 +14,7 @@ from telegram.ext import (
 from flask import Flask
 import threading
 
-TOKEN = "توکن_بات_شما"
+TOKEN = "7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc"
 DATA_FILE = "users.json"
 PENDING_WITHDRAWALS = {}
 ADMIN_IDS = ["5095867558"]
