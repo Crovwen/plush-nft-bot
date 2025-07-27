@@ -1,4 +1,17 @@
-import json import random from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardRemove, Dice from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+import json
+import random
+from telegram
+import InlineKeyboardButton, 
+InlineKeyboardMarkup,
+Update,
+ReplyKeyboardRemove,
+Dice from telegram.ext
+import Application,
+CommandHandler,
+CallbackQueryHandler,
+MessageHandler,
+filters,
+ContextTypes
 
 TOKEN = "7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc" ADMIN_ID = 5095867558 DATA_FILE = "users.json"
 
