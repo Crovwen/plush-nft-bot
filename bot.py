@@ -7,30 +7,26 @@ from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     CallbackQueryHandler,
-    MessageHandler,
     ContextTypes,
+    MessageHandler,
     filters
 )
 from flask import Flask
 import threading
 
-# 🟢 Keep alive with Flask
-web_app = Flask(__name__)
+TOKEN = "توکن_بات_شما"
+DATA_FILE = "users.json"
+PENDING_WITHDRAWALS = {}
+ADMIN_IDS = ["5095867558"]
 
+# 🌐 Flask برای روشن ماندن ربات
+web_app = Flask(__name__)
 @web_app.route('/')
 def home():
     return "Bot is alive!"
+threading.Thread(target=lambda: web_app.run(host="0.0.0.0", port=8080)).start()
 
-def run_web():
-    web_app.run(host="0.0.0.0", port=8080)
-
-threading.Thread(target=run_web).start()
-
-# 🔐 Bot Token
-TOKEN = "7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc"
-DATA_FILE = "users.json"
-PENDING_WITHDRAWALS = {}
-
+# 📁 بارگذاری/ذخیره اطلاعات
 def load_users():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
@@ -49,15 +45,13 @@ def get_main_menu():
         [InlineKeyboardButton("Balance💰", callback_data="balance")],
         [InlineKeyboardButton("My Profile👤", callback_data="profile")],
         [InlineKeyboardButton("Referral Link👥", callback_data="referral")],
-        [InlineKeyboardButton("Withdraw📤", callback_data="withdraw_menu")],
+        [InlineKeyboardButton("NFT Withdrawal📤", callback_data="withdraw_menu")],
         [InlineKeyboardButton("Deposit📥", callback_data="deposit")],
         [InlineKeyboardButton("Daily bonus🎁", callback_data="bonus")]
     ])
 
 def back_button():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 Back to Menu", callback_data="menu")]
-    ])
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Menu", callback_data="menu")]])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -80,11 +74,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if referrer_id != user_id and referrer_id in users:
                 if user_id not in users[referrer_id]["referrals"]:
                     users[referrer_id]["referrals"].append(user_id)
-                    users[referrer_id]["balance"] += 0.05
+                    users[referrer_id]["balance"] += 0.5
                     save_users()
                     await context.bot.send_message(
                         chat_id=int(referrer_id),
-                        text=f"🎉 Your friend ({user_id}) joined via your referral link!\n💰 You earned 0.05 TON!"
+                        text=f"🎉 Your friend ({user_id}) joined the bot via your referral link!\n💸 You earned 0.5 TON!"
                     )
 
     await update.message.reply_text(
@@ -117,10 +111,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif query.data == "referral":
         referral_link = f"https://t.me/PlushNFTbot?start={user_id}"
-        await query.edit_message_text(
-            f"💸 Invite your friends and earn 0.05 TON each!\n\n🔗 Your referral link:\n{referral_link}",
-            reply_markup=back_button()
+        message = (
+            "👥 Invite your friends and earn 0.5 TON for each one!\n"
+            f"🔗 Your referral link:\n{referral_link}"
         )
+        await query.edit_message_text(message, reply_markup=back_button())
 
     elif query.data == "bonus":
         last_bonus = user_data.get("last_bonus")
@@ -165,14 +160,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "nft_withdraw":
         nft_list = (
             "📦 NFT Options:\n"
-            "Desk Calendar #104863 = 1.3 TON\n💎"
-            "Lol Pop #24488 = 1.3 TON\n💎"
-            "B-day Candle #98618 = 1.5 TON\n💎"
-            "Snake Box #48486 = 1.5 TON\n💎"
-            "Candy Can #19264 = 1.6 TON\n💎"
-            "Snoop Dogg #299426 = 2 TON\n💎"
-            "Ginger Cookie #89374 = 18.5 TON\n💎"
-            "Jester Hat #91301 = 50 TON\n💎"
+            "Desk Calendar = 1.3 TON\n💎"
+            "Lol Pop = 1.3 TON\n💎"
+            "B-day Candle = 1.5 TON\n💎"
+            "Snake Box = 1.5 TON\n💎"
+            "Candy Cane = 1.6 TON\n💎"
+            "Snoop Dogg = 2 TON\n💎"
+            "Ginger Cookie = 18.5 TON\n💎"
+            "Jester Hat = 50 TON\n💎"
         )
         buttons = [
             [InlineKeyboardButton(name, callback_data=f"nft_{name}")]
@@ -198,7 +193,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             users[user_id]["withdrawals"] += 1
             save_users()
             await update.message.reply_text(
-                f"✅ Withdrawal successful!\n- {amount} TON deducted from your balance.\nIt will be sent to your wallet within 24 hours."
+                f"✅ Withdrawal successful!\n- {amount} TON deducted from your balance.\nIt will be sent within 24 hours."
             )
         elif info["type"] == "nft":
             nft = info["nft"]
@@ -208,32 +203,68 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def addtoall(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    admin_ids = ["5095867558"]  # Replace with your Telegram ID
-
-    if user_id not in admin_ids:
-        await update.message.reply_text("❌ You are not authorized to use this command.")
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("❌ You are not authorized.")
         return
 
     for uid in users:
-        users[uid]["balance"] = users[uid].get("balance", 0) + 0.1
+        users[uid]["balance"] += 1
         try:
-            await context.bot.send_message(
-                chat_id=int(uid),
-                text="💸 Admin has credited your account with 0.1 TON!"
-            )
-        except:
-            pass
-
+            await context.bot.send_message(chat_id=int(uid), text="🎁 1 TON has been credited to your account by Admin.")
+        except: pass
     save_users()
-    await update.message.reply_text("✅ 0.1 TON added to all users!")
+    await update.message.reply_text("✅ 1 TON sent to all users.")
+
+async def sendall(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("❌ You are not authorized.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Usage: /sendall your message here")
+        return
+
+    msg = " ".join(context.args)
+    for uid in users:
+        try:
+            await context.bot.send_message(chat_id=int(uid), text=msg)
+        except: pass
+    await update.message.reply_text("✅ Message sent to all users.")
+
+async def giveall(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("❌ You are not authorized.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Usage: /giveall <amount>")
+        return
+
+    try:
+        amount = float(context.args[0])
+    except:
+        await update.message.reply_text("Invalid amount.")
+        return
+
+    for uid in users:
+        users[uid]["balance"] += amount
+        try:
+            await context.bot.send_message(chat_id=int(uid), text=f"🎁 {amount} TON has been credited to your account by Admin.")
+        except: pass
+    save_users()
+    await update.message.reply_text(f"✅ {amount} TON added to all users.")
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("addtoall", addtoall))
+    app.add_handler(CommandHandler("sendall", sendall))
+    app.add_handler(CommandHandler("giveall", giveall))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    main() 
