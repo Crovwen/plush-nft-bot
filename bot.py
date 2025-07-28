@@ -253,7 +253,7 @@ from threading import Thread
 from telegram.ext import Application, CommandHandler
 import asyncio
 
-TOKEN =توکن_بات_تو"7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc"
+TOKEN ="7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc"
 
 # بخش Flask
 app = Flask(__name__)
@@ -270,7 +270,7 @@ async def start(update, context):
     await update.message.reply_text("سلام! بات روشنه.")
 
 async def run_bot():
-    application = Application.builder().token(TOKEN).build()
+    application = Application.builder().token("7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc").build()
     application.add_handler(CommandHandler("start", start))
     await application.run_polling()
 
