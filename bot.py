@@ -235,7 +235,7 @@ def ping():
     return "Bot is alive"
 
 def main():
-    app = Application.builder().token(7988090486:AAEFF4WIUJ0tak3TN_5-XQcJooYFHBUIC7g).build()
+    app = Application.builder().token("7988090486:AAEFF4WIUJ0tak3TN_5-XQcJooYFHBUIC7g").build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("addtoall", add_to_all))
     app.add_handler(CommandHandler("broadcast", broadcast))
