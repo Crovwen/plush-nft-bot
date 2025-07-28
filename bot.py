@@ -15,7 +15,7 @@ from telegram.ext import (
 
 # ---------------- CONFIG ------------------
 
-TOKEN = "YOUR_BOT_TOKEN"
+TOKEN = "7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc"
 ADMIN_ID = 5095867558
 DEPOSIT_WALLET_ADDRESS = "UQAG_02lalmnQiisR-fbZLLSr861phEtyIrnWEUc7OwfxX5Y"
 DAILY_BONUS_AMOUNT = 0.06
@@ -235,7 +235,7 @@ def ping():
     return "Bot is alive"
 
 def main():
-    app = Application.builder().token("7988090486:AAEFF4WIUJ0tak3TN_5-XQcJooYFHBUIC7g").build()
+    app = Application.builder().token("7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc").build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("addtoall", add_to_all))
     app.add_handler(CommandHandler("broadcast", broadcast))
