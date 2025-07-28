@@ -247,3 +247,34 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.create_task(asyncio.to_thread(main))
     app_flask.run(host="0.0.0.0", port=10000)
+
+from flask import Flask
+from threading import Thread
+from telegram.ext import Application, CommandHandler
+import asyncio
+
+TOKEN =توکن_بات_تو"7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc"
+
+# بخش Flask
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return 'Bot is Alive ✅'
+
+def run_flask():
+    app.run(host="0.0.0.0", port=10000)
+
+# بخش تلگرام
+async def start(update, context):
+    await update.message.reply_text("سلام! بات روشنه.")
+
+async def run_bot():
+    application = Application.builder().token(TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    await application.run_polling()
+
+# اجرای همزمان
+if __name__ == '__main__':
+    Thread(target=run_flask).start()
+    asyncio.run(run_bot())
