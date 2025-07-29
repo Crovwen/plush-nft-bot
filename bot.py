@@ -247,23 +247,29 @@ def run_flask():
     app.run(host="0.0.0.0", port=10000)
 
 async def run_bot():
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("addtoall", add_to_all))
-    app.add_handler(CommandHandler("addcustom", add_custom))
-    app.add_handler(CommandHandler("broadcast", broadcast))
-    app.add_handler(CallbackQueryHandler(handle_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    await app.run_polling()
+    application = Application.builder().token(TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("addtoall", add_to_all))
+    application.add_handler(CommandHandler("addcustom", add_custom))
+    application.add_handler(CommandHandler("broadcast", broadcast))
+    application.add_handler(CallbackQueryHandler(handle_callback))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
 
-if __name__ == '__main__':
-    from threading import Thread
+if __name__ == "__main__":
     Thread(target=run_flask).start()
+
+    async def main():
+        await run_bot()
 
     try:
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(run_bot())
     except RuntimeError:
-        new_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(new_loop)
-        new_loop.run_until_complete(run_bot()) 
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    loop.create_task(main())
+    loop.run_forever()
