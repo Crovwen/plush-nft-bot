@@ -12,7 +12,7 @@ from threading import Thread
 TOKEN = "7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc"
 ADMIN_ID = 5095867558
 DEPOSIT_WALLET_ADDRESS = "UQAG_02lalmnQiisR-fbZLLSr861phEtyIrnWEUc7OwfxX5Y"
-DAILY_BONUS_AMOUNT = 0.06
+DAILY_BONUS_AMOUNT = 0.08
 REFERRAL_REWARD = 0.05
 ADD_TO_ALL_AMOUNT = 0.1
 USERS_FILE = "users.json"
@@ -57,7 +57,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "balance": 0.0,
             "referrals": [],
             "last_bonus": "1970-01-01T00:00:00",
-            "username": update.effective_user.username or "N/A"
+            "username": update.effective_user.username or "N/A",
+            "start_date": datetime.now(pytz.utc).strftime('%Y-%m-%d')
         }
         if context.args:
             ref_id = context.args[0]
@@ -75,17 +76,26 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = users.get(user_id)
 
     if query.data == "balance":
-        await query.edit_message_text(f"💰 Balance: {user['balance']} TON", reply_markup=get_main_menu())
+        balance = round(user['balance'], 2)
+        await query.edit_message_text(f"💰 Balance: {balance:.2f} TON", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
     elif query.data == "profile":
-        await query.edit_message_text(f"👤 Username: @{user['username']}\n🔗 Referrals: {len(user['referrals'])}", reply_markup=get_main_menu())
+        text = (
+            f"👤 Name: {query.from_user.first_name or 'N/A'}\n"
+            f"🆔 ID: {user_id}\n"
+            f"📆 Started: {user.get('start_date', 'N/A')}\n"
+            f"👥 Referrals: {len(user['referrals'])}\n"
+            f"📤 Withdrawals: N/A\n"
+            f"📥 Deposits: N/A"
+        )
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
     elif query.data == "referral":
         link = f"https://t.me/PlushNFTbot?start={user_id}"
-        await query.edit_message_text(f"🔗 Your referral link:\n{link}\n\n💵 You earn {REFERRAL_REWARD} TON per referral.", reply_markup=get_main_menu())
+        await query.edit_message_text(f"🔗 Your referral link:\n{link}\n\n💵 You earn {REFERRAL_REWARD} TON per referral.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
     elif query.data == "deposit":
-        await query.edit_message_text(f"📥 Send TON to this address:\n\n{DEPOSIT_WALLET_ADDRESS}\n\n🔄 Balance updates manually after confirmation.", reply_markup=get_main_menu())
+        await query.edit_message_text(f"📥 Send TON to this address:\n\n`{DEPOSIT_WALLET_ADDRESS}`\n\n🔄 Balance updates manually after confirmation.", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
     elif query.data == "daily_bonus":
         now = datetime.now(pytz.utc)
@@ -94,64 +104,28 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user["balance"] += DAILY_BONUS_AMOUNT
             user["last_bonus"] = now.isoformat()
             save_users(users)
-            await query.edit_message_text(f"🎁 You received {DAILY_BONUS_AMOUNT} TON bonus!", reply_markup=get_main_menu())
+            await query.edit_message_text(f"🎁 You received {DAILY_BONUS_AMOUNT} TON as your daily bonus!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
         else:
             remaining = timedelta(hours=24) - (now - last_bonus_time)
             hours = remaining.seconds // 3600
             minutes = (remaining.seconds % 3600) // 60
-            await query.edit_message_text(f"⏳ Come back in {hours}h {minutes}m for next bonus.", reply_markup=get_main_menu())
-
-    elif query.data == "withdrawal":
-        buttons = [
-            [InlineKeyboardButton("TON Withdrawal📤", callback_data="withdraw_ton")],
-            [InlineKeyboardButton("NFT Withdrawal📤", callback_data="withdraw_nft")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="back")]
-        ]
-        await query.edit_message_text("Select withdrawal type:", reply_markup=InlineKeyboardMarkup(buttons))
-
-    elif query.data == "withdraw_ton":
-        options = [0.5, 1, 2, 5, 10, 20]
-        buttons = [[InlineKeyboardButton(f"{amt} TON", callback_data=f"ton_{amt}")] for amt in options]
-        await query.edit_message_text("Choose amount to withdraw:", reply_markup=InlineKeyboardMarkup(buttons))
-
-    elif query.data.startswith("ton_"):
-        amount = float(query.data.split("_")[1])
-        if user["balance"] >= amount:
-            user["balance"] -= amount
-            save_users(users)
-            await context.bot.send_message(chat_id=user_id, text=f"💸 Enter your TON wallet address to withdraw {amount} TON:")
-            context.user_data["pending_withdraw"] = amount
-        else:
-            await query.edit_message_text("❌ Not enough balance.", reply_markup=get_main_menu())
-
-    elif query.data == "withdraw_nft":
-        buttons = [
-            [InlineKeyboardButton(f"{name} ({price} TON)", callback_data=f"nft_{idx}")]
-            for idx, (name, _, price) in enumerate(NFT_LIST)
-        ]
-        await query.edit_message_text("Select NFT to withdraw:", reply_markup=InlineKeyboardMarkup(buttons))
-
-    elif query.data.startswith("nft_"):
-        idx = int(query.data.split("_")[1])
-        name, _, price = NFT_LIST[idx]
-        if user["balance"] >= price:
-            user["balance"] -= price
-            save_users(users)
-            await context.bot.send_message(chat_id=user_id, text=f"🎁 Enter your Telegram username to receive **{name}**:")
-            context.user_data["pending_nft"] = name
-        else:
-            await query.edit_message_text("❌ Not enough balance.", reply_markup=get_main_menu())
+            await query.edit_message_text(f"⏳ Come back in {hours}h {minutes}m for your next bonus.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
     elif query.data == "betting":
+        explanation = (
+            "🎲 Choose a bet type:\n\n"
+            "🔹 *Odd (1,3,5)* or *Even (2,4,6)*: 1.5x reward\n"
+            "🔹 *Pairs (1-1 to 6-6)*: 3x reward\n"
+        )
         buttons = [
-            [InlineKeyboardButton("🎯 Even (2,4,6) — 1.5x", callback_data="even"),
-             InlineKeyboardButton("🎲 Odd (1,3,5) — 1.5x", callback_data="odd")],
-            [InlineKeyboardButton("🎯 Pairs (1-1 to 6-6) — 3x", callback_data="pair")],
+            [InlineKeyboardButton("Even (2,4,6)", callback_data="even"), InlineKeyboardButton("Odd (1,3,5)", callback_data="odd")],
+            [InlineKeyboardButton("1-1", callback_data="pair_1"), InlineKeyboardButton("2-2", callback_data="pair_2"), InlineKeyboardButton("3-3", callback_data="pair_3")],
+            [InlineKeyboardButton("4-4", callback_data="pair_4"), InlineKeyboardButton("5-5", callback_data="pair_5"), InlineKeyboardButton("6-6", callback_data="pair_6")],
             [InlineKeyboardButton("⬅️ Back", callback_data="back")]
         ]
-        await query.edit_message_text("Choose your bet type:", reply_markup=InlineKeyboardMarkup(buttons))
+        await query.edit_message_text(explanation, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
 
-    elif query.data in ["even", "odd", "pair"]:
+    elif query.data in ["even", "odd"] or query.data.startswith("pair_"):
         context.user_data["bet_type"] = query.data
         await context.bot.send_message(chat_id=user_id, text="💸 Enter your bet amount:")
 
@@ -161,16 +135,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     user = users.get(user_id)
-
-    if "pending_withdraw" in context.user_data:
-        amount = context.user_data.pop("pending_withdraw")
-        await update.message.reply_text(f"✅ Withdrawal of {amount} TON requested.\n💬 You’ll receive it in 24 hours.")
-        return
-
-    if "pending_nft" in context.user_data:
-        nft = context.user_data.pop("pending_nft")
-        await update.message.reply_text(f"✅ Your NFT **{nft}** will be sent in 24 hours!")
-        return
 
     if "bet_type" in context.user_data:
         try:
@@ -182,60 +146,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             dice = random.randint(1, 6)
             win = False
             multiplier = 1.5 if bet_type in ["even", "odd"] else 3
+
             if bet_type == "even" and dice % 2 == 0:
                 win = True
             elif bet_type == "odd" and dice % 2 == 1:
                 win = True
-            elif bet_type == "pair":
-                win = random.choice([True, False])  # 50% for simplification
+            elif bet_type.startswith("pair_"):
+                pair_num = int(bet_type.split("_")[1])
+                if dice == pair_num:
+                    win = True
+
             if win:
                 reward = amount * multiplier
                 user["balance"] += reward
-                result = f"🎲 Dice: {dice}\n🎉 You won {reward} TON!"
+                result = f"🎲 Dice rolled: {dice}\n🎉 You won {reward:.2f} TON!"
             else:
                 user["balance"] -= amount
-                result = f"🎲 Dice: {dice}\n❌ You lost {amount} TON."
+                result = f"🎲 Dice rolled: {dice}\n❌ You lost {amount:.2f} TON."
+
             save_users(users)
             await update.message.reply_text(result)
         except:
             await update.message.reply_text("❗ Please enter a valid number.")
-
-# Admin commands
-async def add_to_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID: return
-    for user in users.values():
-        user["balance"] += ADD_TO_ALL_AMOUNT
-    save_users(users)
-    for uid in users:
-        try:
-            await context.bot.send_message(chat_id=int(uid), text=f"🎁 Admin added {ADD_TO_ALL_AMOUNT} TON to your balance.")
-        except: continue
-    await update.message.reply_text("✅ Added balance to all.")
-
-async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID: return
-    if not context.args: return await update.message.reply_text("Usage: /addcustom 1.5")
-    try:
-        amount = float(context.args[0])
-        for user in users.values():
-            user["balance"] += amount
-        save_users(users)
-        for uid in users:
-            try:
-                await context.bot.send_message(chat_id=int(uid), text=f"🎁 Admin added {amount} TON to your balance.")
-            except: continue
-        await update.message.reply_text(f"✅ Added {amount} TON to all users.")
-    except:
-        await update.message.reply_text("❗ Invalid amount.")
-
-async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID: return
-    msg = " ".join(context.args)
-    for uid in users:
-        try:
-            await context.bot.send_message(chat_id=int(uid), text=msg)
-        except: continue
-    await update.message.reply_text("✅ Broadcast sent.")
 
 # Flask for Render
 app = Flask(__name__)
@@ -249,12 +181,9 @@ def run_flask():
 async def run_bot():
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("addtoall", add_to_all))
-    application.add_handler(CommandHandler("addcustom", add_custom))
-    application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
+
     await application.initialize()
     await application.start()
     await application.updater.start_polling()
