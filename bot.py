@@ -44,7 +44,7 @@ def get_main_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("💰 Balance", callback_data="balance"), InlineKeyboardButton("👤 Profile", callback_data="profile")],
         [InlineKeyboardButton("🔗 Referral Link", callback_data="referral")],
-        [InlineKeyboardButton("📤 Withdrawal📤", callback_data="withdrawal_menu")],
+        [InlineKeyboardButton("📤 Withdrawal", callback_data="withdrawal")],
         [InlineKeyboardButton("📥 Deposit", callback_data="deposit")],
         [InlineKeyboardButton("🎁 Daily Bonus", callback_data="daily_bonus")],
         [InlineKeyboardButton("🎲 Betting", callback_data="betting")]
@@ -77,7 +77,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == "balance":
         balance = round(user['balance'], 2)
-        await context.bot.send_message(chat_id=user_id, text=f"💰 Balance: {balance:.2f} TON", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+        await query.edit_message_text(f"💰 Balance: {balance:.2f} TON", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
     elif query.data == "profile":
         text = (
@@ -88,14 +88,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📤 Withdrawals: N/A\n"
             f"📥 Deposits: N/A"
         )
-        await context.bot.send_message(chat_id=user_id, text=text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
     elif query.data == "referral":
         link = f"https://t.me/PlushNFTbot?start={user_id}"
-        await context.bot.send_message(chat_id=user_id, text=f"🔗 Your referral link:\n{link}\n\n💵 You earn {REFERRAL_REWARD} TON per referral.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+        await query.edit_message_text(f"🔗 Your referral link:\n{link}\n\n💵 You earn {REFERRAL_REWARD} TON per referral.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
     elif query.data == "deposit":
-        await context.bot.send_message(chat_id=user_id, text=f"📥 Send TON to this address:\n\n`{DEPOSIT_WALLET_ADDRESS}`\n\n🔄 Balance updates manually after confirmation.", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+        await query.edit_message_text(f"📥 Send TON to this address:\n\n`{DEPOSIT_WALLET_ADDRESS}`\n\n🔄 Balance updates manually after confirmation.", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
     elif query.data == "daily_bonus":
         now = datetime.now(pytz.utc)
@@ -104,18 +104,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user["balance"] += DAILY_BONUS_AMOUNT
             user["last_bonus"] = now.isoformat()
             save_users(users)
-            await context.bot.send_message(chat_id=user_id, text=f"🎁 You received {DAILY_BONUS_AMOUNT} TON as your daily bonus!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+            await query.edit_message_text(f"🎁 You received {DAILY_BONUS_AMOUNT} TON as your daily bonus!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
         else:
             remaining = timedelta(hours=24) - (now - last_bonus_time)
             hours = remaining.seconds // 3600
             minutes = (remaining.seconds % 3600) // 60
-            await context.bot.send_message(chat_id=user_id, text=f"⏳ Come back in {hours}h {minutes}m for your next bonus.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+            await query.edit_message_text(f"⏳ Come back in {hours}h {minutes}m for your next bonus.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
-    elif query.data == "withdrawal_menu":
-        await context.bot.send_message(chat_id=user_id, text="📤 Withdrawal Options:\nChoose the type:", reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("TON Withdrawal", callback_data="ton_withdrawal"), InlineKeyboardButton("NFT Withdrawal", callback_data="nft_withdrawal")],
+    elif query.data == "withdrawal":
+        buttons = [
+            [InlineKeyboardButton("TON Withdrawal📤", callback_data="ton_withdrawal")],
+            [InlineKeyboardButton("NFT Withdrawal📤", callback_data="nft_withdrawal")],
             [InlineKeyboardButton("⬅️ Back", callback_data="back")]
-        ]))
+        ]
+        await query.edit_message_text("📤 Choose a withdrawal method:", reply_markup=InlineKeyboardMarkup(buttons))
 
     elif query.data == "betting":
         explanation = (
@@ -129,14 +131,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("4-4", callback_data="pair_4"), InlineKeyboardButton("5-5", callback_data="pair_5"), InlineKeyboardButton("6-6", callback_data="pair_6")],
             [InlineKeyboardButton("⬅️ Back", callback_data="back")]
         ]
-        await context.bot.send_message(chat_id=user_id, text=explanation, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
+        await query.edit_message_text(explanation, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
 
     elif query.data in ["even", "odd"] or query.data.startswith("pair_"):
         context.user_data["bet_type"] = query.data
         await context.bot.send_message(chat_id=user_id, text="💸 Enter your bet amount:")
 
     elif query.data == "back":
-        await context.bot.send_message(chat_id=user_id, text="Choose an option 👇", reply_markup=get_main_menu())
+        await query.edit_message_text("Choose an option 👇", reply_markup=get_main_menu())
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -175,6 +177,64 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             await update.message.reply_text("❗ Please enter a valid number.")
 
+# Admin commands
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    message = " ".join(context.args)
+    for uid in users:
+        try:
+            await context.bot.send_message(chat_id=int(uid), text=message)
+        except:
+            pass
+    await update.message.reply_text("✅ Broadcast sent.")
+
+async def add_to_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        amount = float(context.args[0])
+        for user in users.values():
+            user["balance"] += amount
+        save_users(users)
+        await update.message.reply_text(f"✅ Added {amount} TON to all users.")
+    except:
+        await update.message.reply_text("❗ Usage: /addtoall [amount]")
+
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    await update.message.reply_text(f"👥 Total users: {len(users)}")
+
+async def get_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        uid = context.args[0]
+        user = users.get(uid)
+        if user:
+            await update.message.reply_text(f"💰 User {uid} balance: {user['balance']:.2f} TON")
+        else:
+            await update.message.reply_text("❗ User not found.")
+    except:
+        await update.message.reply_text("❗ Usage: /balance [user_id]")
+
+async def set_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        uid = context.args[0]
+        amount = float(context.args[1])
+        user = users.get(uid)
+        if user:
+            user["balance"] = amount
+            save_users(users)
+            await update.message.reply_text(f"✅ Set balance of {uid} to {amount} TON")
+        else:
+            await update.message.reply_text("❗ User not found.")
+    except:
+        await update.message.reply_text("❗ Usage: /setbalance [user_id] [amount]")
+
 # Flask for Render
 app = Flask(__name__)
 @app.route("/")
@@ -187,6 +247,11 @@ def run_flask():
 async def run_bot():
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("broadcast", broadcast))
+    application.add_handler(CommandHandler("addtoall", add_to_all))
+    application.add_handler(CommandHandler("stats", stats))
+    application.add_handler(CommandHandler("balance", get_balance))
+    application.add_handler(CommandHandler("setbalance", set_balance))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
