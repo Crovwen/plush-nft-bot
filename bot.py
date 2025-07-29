@@ -90,18 +90,29 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif query.data == "daily_bonus":
         now = datetime.now(pytz.utc)
-        last_claim = datetime.fromisoformat(user["last_bonus"])
-        if now - last_claim >= timedelta(hours=24):
+        try:
+            last_claim = datetime.fromisoformat(user["last_bonus"])
+        except:
+            last_claim = datetime(1970, 1, 1, tzinfo=pytz.utc)
+
+        time_passed = now - last_claim
+        if time_passed >= timedelta(hours=24):
             user["balance"] += DAILY_BONUS_AMOUNT
             user["last_bonus"] = now.isoformat()
             save_users(users)
-            await query.edit_message_text(f"🎉 You claimed {DAILY_BONUS_AMOUNT} TON bonus!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+            await query.edit_message_text(
+                f"🎉 You claimed {DAILY_BONUS_AMOUNT} TON bonus!",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]])
+            )
         else:
-            remaining = timedelta(hours=24) - (now - last_claim)
+            remaining = timedelta(hours=24) - time_passed
             hours, remainder = divmod(int(remaining.total_seconds()), 3600)
             minutes = remainder // 60
-            await query.edit_message_text(f"⏳ Bonus available in {hours}h {minutes}m.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
-
+            await query.edit_message_text(
+                f"⏳ Bonus available in {hours}h {minutes}m.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]])
+)
+            
     elif query.data == "deposit":
         text = f"📥 Send TON to this wallet:\n`{DEPOSIT_WALLET_ADDRESS}`\n\n(Make sure to send only TON!)"
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
