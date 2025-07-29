@@ -1,312 +1,296 @@
 import json
 import random
-import os
-import pytz
-import asyncio
-from datetime import datetime, timedelta
-from flask import Flask
+import time
+from datetime import datetime
+from flask import Flask, request
+import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ConversationHandler, ContextTypes, filters
-from threading import Thread
+from telegram.ext import CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext, Updater
 
-TOKEN = "7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc"
-ADMIN_ID = 5095867558
-DEPOSIT_WALLET_ADDRESS = "UQAG_02lalmnQiisR-fbZLLSr861phEtyIrnWEUc7OwfxX5Y"
-DAILY_BONUS_AMOUNT = 0.08
-REFERRAL_REWARD = 0.05
-USERS_FILE = "users.json"
-MIN_BET = 0.1
+# ====== تنظیمات اولیه ======
+TOKEN = '7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc'  # توکن بات رو اینجا بزن
+ADMIN_ID = 5095867558  # آیدی تلگرام ادمین رو اینجا بزن
 
-NFT_LIST = [
-    ("Desk Calendar", "#104863", 1.3),
-    ("Lol Pop", "#24488", 1.3),
-    ("B-day Candle", "#98618", 1.5),
-    ("Snake Box", "#48486", 1.5),
-    ("Candy Cane", "#19264", 1.6),
-    ("Snoop Dogg", "#299426", 2),
-    ("Ginger Cookie", "#89374", 18.5),
-    ("Jester Hat", "#91301", 50)
-]
+DEPOSIT_WALLET = "UQAG_02lalmnQiisR-fbZLLSr861phEtyIrnWEUc7OwfxX5Y"
 
-users = {}
+bot = telegram.Bot(token=TOKEN)
+app = Flask(__name__)
+users_file = 'users.json'
 
+# ====== بارگذاری و ذخیره اطلاعات کاربران ======
 def load_users():
-    global users
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "r") as f:
-            users = json.load(f)
-    else:
-        users = {}
+    try:
+        with open(users_file, 'r') as f:
+            return json.load(f)
+    except:
+        return {}
 
-def save_users():
-    with open(USERS_FILE, "w") as f:
-        json.dump(users, f, indent=4)
+def save_users(users):
+    with open(users_file, 'w') as f:
+        json.dump(users, f)
 
-load_users()
+users = load_users()
 
-def get_main_menu():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("💰 Balance", callback_data="balance"), InlineKeyboardButton("👤 Profile", callback_data="profile")],
-        [InlineKeyboardButton("🔗 Referral Link", callback_data="referral")],
-        [InlineKeyboardButton("📤 Withdrawal", callback_data="withdrawal")],
-        [InlineKeyboardButton("📥 Deposit", callback_data="deposit")],
-        [InlineKeyboardButton("🎁 Daily Bonus", callback_data="daily_bonus")],
-        [InlineKeyboardButton("🎲 Betting", callback_data="betting")]
-    ])
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    if user_id not in users:
-        users[user_id] = {
-            "balance": 0.0,
-            "referrals": [],
-            "last_bonus": "1970-01-01T00:00:00",
-            "username": update.effective_user.username or "N/A",
-            "start_date": datetime.now(pytz.utc).strftime('%Y-%m-%d')
+# ====== اضافه کردن کاربر جدید به دیتابیس ======
+def ensure_user(user_id, username, referrer_id=None):
+    uid = str(user_id)
+    if uid not in users:
+        users[uid] = {
+            'balance': 0.0,
+            'referrals': [],
+            'start_date': str(datetime.utcnow()),
+            'withdrawals': [],
+            'deposits': [],
+            'username': username or "",
+            'last_bonus': 0,
+            'referred_by': None,
         }
-        if context.args:
-            ref_id = context.args[0]
-            if ref_id != user_id and ref_id in users:
-                users[ref_id]["balance"] += REFERRAL_REWARD
-                users[ref_id]["referrals"].append(user_id)
-                await context.bot.send_message(chat_id=int(ref_id), text=f"🎉 @{update.effective_user.username} joined via your link!\n💰 You got {REFERRAL_REWARD} TON.")
-        save_users()
-    await update.message.reply_text("Choose an option 👇", reply_markup=get_main_menu())
+        # اگر رفرال وجود داشت و معتبر بود
+        if referrer_id and str(referrer_id) in users and str(referrer_id) != uid:
+            users[uid]['referred_by'] = str(referrer_id)
+            # افزودن این یوزر به لیست رفرال‌های دعوت‌کننده
+            users[str(referrer_id)]['referrals'].append(uid)
+            # اضافه کردن 0.05 TON به موجودی دعوت‌کننده
+            users[str(referrer_id)]['balance'] += 0.05
+            save_users(users)
+            # ارسال پیام به دعوت‌کننده
+            try:
+                bot.send_message(
+                    chat_id=int(referrer_id),
+                    text=f"🎉 The [{username or uid}](tg://user?id={uid}) joined Plsuh NFT through your invitation link and 0.05 TON was added to your balance.",
+                    parse_mode=telegram.ParseMode.MARKDOWN
+                )
+            except Exception as e:
+                print("Error sending referral msg:", e)
+        save_users(users)
 
-# ============= CALLBACK HANDLER ============
-withdraw_amounts = [0.5, 1, 2, 3, 5, 10, 15, 20]
-awaiting_withdraw_address = {}
-awaiting_bet_amount = {}
-current_bet_type = {}
+# ====== منوی اصلی ======
+def get_main_menu():
+    keyboard = [
+        [InlineKeyboardButton("Balance💰", callback_data="balance")],
+        [InlineKeyboardButton("Daily Bonus🎁", callback_data="daily_bonus")],
+        [InlineKeyboardButton("Betting🎲", callback_data="betting")],
+        [InlineKeyboardButton("Deposit➕", callback_data="deposit")],
+        [InlineKeyboardButton("Withdrawal📤", callback_data="withdrawal")],
+        [InlineKeyboardButton("Profile👤", callback_data="profile")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def get_back_button():
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back")]])
+
+# ====== هندلر دستور استارت ======
+def start(update: Update, context: CallbackContext):
+    user = update.effective_user
+    # اگر پارامتر رفرال داشت
+    ref_id = None
+    args = context.args
+    if args:
+        ref_id = args[0]
+    ensure_user(user.id, user.username, ref_id)
+    update.message.reply_text("👋 Welcome to the bot!", reply_markup=get_main_menu())
+
+# ====== هندلر دکمه‌ها ======
+def button(update: Update, context: CallbackContext):
     query = update.callback_query
-    await query.answer()
-    user_id = str(query.from_user.id)
-    user = users.get(user_id)
+    user = query.from_user
+    uid = str(user.id)
+    ensure_user(user.id, user.username)
+    user_data = users[uid]
+    data = query.data
 
-    if not user:
-        await query.edit_message_text("User not found. Please /start again.")
-        return
+    if data == "balance":
+        query.edit_message_text(f"💰 Your balance: {user_data['balance']:.2f} TON", reply_markup=get_back_button())
 
-    if query.data == "balance":
-        await query.edit_message_text(f"💰 Your balance: {user['balance']:.2f} TON", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
-
-    elif query.data == "profile":
-        referrals = len(user.get("referrals", []))
-        await query.edit_message_text(f"👤 Username: @{user['username']}\n🆔 ID: {user_id}\n📅 Joined: {user['start_date']}\n👥 Referrals: {referrals}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
-
-    elif query.data == "referral":
-        await query.edit_message_text(f"🔗 Your referral link:\nhttps://t.me/PlushNFTbot?start={user_id}\n💰 Get {REFERRAL_REWARD} TON for each invite!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
-
-    elif query.data == "daily_bonus":
-        now = datetime.now(pytz.utc)
-        last_claim = datetime.fromisoformat(user["last_bonus"])
-        if now - last_claim >= timedelta(hours=24):
-            user["balance"] += DAILY_BONUS_AMOUNT
-            user["last_bonus"] = now.isoformat()
-            save_users()
-            await query.edit_message_text(f"🎉 You claimed {DAILY_BONUS_AMOUNT} TON bonus!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+    elif data == "daily_bonus":
+        now = time.time()
+        last = user_data.get("last_bonus", 0)
+        if now - last >= 86400:
+            user_data["balance"] += 0.08
+            user_data["last_bonus"] = now
+            save_users(users)
+            query.edit_message_text("🎁 You received your daily bonus of 0.08 TON!", reply_markup=get_back_button())
         else:
-            remaining = timedelta(hours=24) - (now - last_claim)
-            h, r = divmod(int(remaining.total_seconds()), 3600)
-            m = r // 60
-            await query.edit_message_text(f"⏳ Bonus available in {h}h {m}m.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+            remaining = 86400 - (now - last)
+            hours = int(remaining // 3600)
+            minutes = int((remaining % 3600) // 60)
+            query.edit_message_text(f"⌛ You can claim your next bonus in {hours}h {minutes}m", reply_markup=get_back_button())
 
-    elif query.data == "deposit":
-        text = f"📥 Send TON to this wallet:\n`{DEPOSIT_WALLET_ADDRESS}`\n\n(Make sure to send only TON!)"
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+    elif data == "back":
+        query.edit_message_text("Main Menu:", reply_markup=get_main_menu())
 
-    elif query.data == "withdrawal":
-        buttons = [[InlineKeyboardButton(f"{amt} TON", callback_data=f"ton_withdraw_{amt}")] for amt in withdraw_amounts]
-        buttons.append([InlineKeyboardButton("🎨 NFT Withdrawal", callback_data="nft_withdrawal")])
-        buttons.append([InlineKeyboardButton("⬅️ Back", callback_data="back")])
-        await query.edit_message_text("📤 Choose withdrawal option:", reply_markup=InlineKeyboardMarkup(buttons))
+    elif data == "betting":
+        keyboard = [
+            [InlineKeyboardButton("1-3-5", callback_data="bet_135"),
+             InlineKeyboardButton("2-4-6", callback_data="bet_246")],
+            [InlineKeyboardButton("1-1", callback_data="pair_1"),
+             InlineKeyboardButton("2-2", callback_data="pair_2"),
+             InlineKeyboardButton("3-3", callback_data="pair_3")],
+            [InlineKeyboardButton("4-4", callback_data="pair_4"),
+             InlineKeyboardButton("5-5", callback_data="pair_5"),
+             InlineKeyboardButton("6-6", callback_data="pair_6")],
+            [InlineKeyboardButton("🔙 Back", callback_data="back")]
+        ]
+        query.edit_message_text("🎲 Choose a betting option:", reply_markup=InlineKeyboardMarkup(keyboard))
 
-    elif query.data.startswith("ton_withdraw_"):
-        amt = float(query.data.split("_")[-1])
-        if user["balance"] >= amt:
-            awaiting_withdraw_address[user_id] = amt
-            await query.edit_message_text("📤 Please send your TON wallet address:")
+    elif data.startswith("bet_") or data.startswith("pair_"):
+        context.user_data["bet_type"] = data
+        query.edit_message_text("💵 Enter amount to bet (min 0.1 TON):")
+        context.user_data["awaiting_bet"] = True
+
+    elif data == "deposit":
+        # نمایش آدرس ولت به صورت مونو اسپیس و قابل کپی
+        wallet_text = f"💰 Deposit Wallet Address:\n\n<code>{DEPOSIT_WALLET}</code>\n\nClick to copy the address."
+        keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="back")]]
+        query.edit_message_text(wallet_text, parse_mode=telegram.ParseMode.HTML, reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "withdrawal":
+        keyboard = [
+            [InlineKeyboardButton("0.5 TON", callback_data="w_0.5"),
+             InlineKeyboardButton("1 TON", callback_data="w_1")],
+            [InlineKeyboardButton("2 TON", callback_data="w_2"),
+             InlineKeyboardButton("5 TON", callback_data="w_5")],
+            [InlineKeyboardButton("10 TON", callback_data="w_10"),
+             InlineKeyboardButton("15 TON", callback_data="w_15")],
+            [InlineKeyboardButton("20 TON", callback_data="w_20")],
+            [InlineKeyboardButton("NFT Withdrawal📤", callback_data="withdraw_nft")],
+            [InlineKeyboardButton("🔙 Back", callback_data="back")]
+        ]
+        query.edit_message_text("💸 Select TON amount to withdraw:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data.startswith("w_"):
+        amount = float(data.split("_")[1])
+        if user_data["balance"] >= amount:
+            context.user_data["pending_withdraw"] = amount
+            query.edit_message_text("✍️ Please enter your TON wallet address:")
+            context.user_data["awaiting_wallet"] = True
         else:
-            await query.edit_message_text("❌ Not enough balance.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+            query.edit_message_text("❌ Insufficient balance!", reply_markup=get_back_button())
 
-    elif query.data == "nft_withdrawal":
-        nft_text = "🎨 Available NFTs:\n" + "\n".join([f"• {n[0]} {n[1]} — {n[2]} TON" for n in NFT_LIST]) + "\n\nChoose one:"
-        buttons = [[InlineKeyboardButton(f"{n[0]} {n[1]}", callback_data=f"nft_{i}")] for i, n in enumerate(NFT_LIST)]
-        buttons.append([InlineKeyboardButton("⬅️ Back", callback_data="back")])
-        await query.edit_message_text(nft_text, reply_markup=InlineKeyboardMarkup(buttons))
+    elif data == "withdraw_nft":
+    text = "🎨 *Available NFTs:*\n"
+    text += "• Desk Calendar #104863 = 1.3 TON\n"
+    text += "• Lol Pop #24488 = 1.3 TON\n"
+    text += "• B-day Candle #98618 = 1.5 TON\n"
+    text += "• Snake Box #48486 = 1.5 TON\n"
+    text += "• Candy Cane #19264 = 1.6 TON\n"
+    text += "• Snoop Dogg #299426 = 2 TON\n"
+    text += "• Ginger Cookie #89374 = 18.5 TON\n"
+    text += "• Jester Hat #91301 = 50 TON"
 
-    elif query.data.startswith("nft_"):
-        idx = int(query.data.split("_")[1])
-        nft_name, nft_tag, price = NFT_LIST[idx]
-        if user["balance"] >= price:
-            user["balance"] -= price
-            save_users()
-            await query.edit_message_text(f"✅ NFT '{nft_name} {nft_tag}' will be sent within 24h.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+    keyboard = [
+        [InlineKeyboardButton("Desk Calendar", callback_data="nft_desk_calendar")],
+        [InlineKeyboardButton("Lol Pop", callback_data="nft_lol_pop")],
+        [InlineKeyboardButton("B-day Candle", callback_data="nft_bday_candle")],
+        [InlineKeyboardButton("Snake Box", callback_data="nft_snake_box")],
+        [InlineKeyboardButton("Candy Cane", callback_data="nft_candy_cane")],
+        [InlineKeyboardButton("Snoop Dogg", callback_data="nft_snoop_dogg")],
+        [InlineKeyboardButton("Ginger Cookie", callback_data="nft_ginger_cookie")],
+        [InlineKeyboardButton("Jester Hat", callback_data="nft_jester_hat")],
+        [InlineKeyboardButton("🔙 Back", callback_data="withdrawal")]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+
+    elif data.startswith("nft_"):
+    nft_prices = {
+        "nft_desk_calendar": (1.3, "Desk Calendar #104863"),
+        "nft_lol_pop": (1.3, "Lol Pop #24488"),
+        "nft_bday_candle": (1.5, "B-day Candle #98618"),
+        "nft_snake_box": (1.5, "Snake Box #48486"),
+        "nft_candy_cane": (1.6, "Candy Cane #19264"),
+        "nft_snoop_dogg": (2, "Snoop Dogg #299426"),
+        "nft_ginger_cookie": (18.5, "Ginger Cookie #89374"),
+        "nft_jester_hat": (50, "Jester Hat #91301"),
+    }
+
+    if data in nft_prices:
+        price, nft_name = nft_prices[data]
+        if user_data[str(user_id)]["balance"] >= price:
+            context.user_data["nft_price"] = price
+            context.user_data["nft_name"] = nft_name
+            context.user_data["awaiting_nft_username"] = True
+            query.edit_message_text(
+                f"✅ You selected: *{nft_name}*\n\nPlease enter your Telegram username (@username):",
+                parse_mode=ParseMode.MARKDOWN
+            )
         else:
-            await query.edit_message_text("❌ Not enough balance for this NFT.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+            query.edit_message_text("❌ You don’t have enough TON for this NFT.\nPlease top up your balance or choose a cheaper NFT.")
 
-    elif query.data == "back":
-        await query.edit_message_text("Choose an option 👇", reply_markup=get_main_menu())
-
-# ادامه در بخش دوم ...
-
-# ====== شرط‌بندی ======
-    elif query.data == "betting":
-        await query.edit_message_text(
-            "🎲 Choose a bet type:\n\n"
-            "• Odd (1-3-5) or Even (2-4-6): 1.5x\n"
-            "• Pairs (1-1 to 6-6): 3x",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Odd ⚫", callback_data="bet_odd"),
-                 InlineKeyboardButton("Even ⚪", callback_data="bet_even")],
-                [InlineKeyboardButton("1-1", callback_data="bet_pair_1_1"),
-                 InlineKeyboardButton("2-2", callback_data="bet_pair_2_2"),
-                 InlineKeyboardButton("3-3", callback_data="bet_pair_3_3")],
-                [InlineKeyboardButton("4-4", callback_data="bet_pair_4_4"),
-                 InlineKeyboardButton("5-5", callback_data="bet_pair_5_5"),
-                 InlineKeyboardButton("6-6", callback_data="bet_pair_6_6")],
-                [InlineKeyboardButton("⬅️ Back", callback_data="back")]
-            ])
-        )
-
-    elif query.data.startswith("bet_"):
-        current_bet_type[user_id] = query.data
-        awaiting_bet_amount[user_id] = True
-        await query.edit_message_text("💸 Enter bet amount (min 0.1 TON):")
-
-# ====== پیام متنی ها ======
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
+def handle_text(update: Update, context: CallbackContext):
+    user = update.effective_user
+    uid = str(user.id)
     text = update.message.text
-
-    if user_id in awaiting_withdraw_address:
-        address = text.strip()
-        amt = awaiting_withdraw_address.pop(user_id)
-        users[user_id]["balance"] -= amt
-        save_users()
-        await update.message.reply_text(f"✅ {amt} TON will be sent to {address} within 24h.")
+    ensure_user(user.id, user.username)
+    
+    if context.user_data.get("awaiting_wallet"):
+        wallet = text
+        amount = context.user_data.get("pending_withdraw", 0)
+        users[uid]["balance"] -= amount
+        save_users(users)
+        update.message.reply_text(f"✅ Withdrawal of {amount:.2f} TON requested to:\n`{wallet}`\n\nWill be processed within 24h.", parse_mode=telegram.ParseMode.MARKDOWN)
+        context.user_data["awaiting_wallet"] = False
         return
 
-    if awaiting_bet_amount.get(user_id):
+    if context.user_data.get("awaiting_nft_username"):
+        username = text
+        nft_name = context.user_data.get("nft_name", "NFT")
+        price = context.user_data.get("nft_price", 0)
+
+        users[uid]["balance"] -= price
+        save_users(users)
+
+        update.message.reply_text(
+            f"✅ Request to withdraw *{nft_name}* for @{username} received.\nYour NFT will be sent within 24 hours.",
+            parse_mode=telegram.ParseMode.MARKDOWN
+        )
+        context.user_data["awaiting_nft_username"] = False
+
+def admin_commands(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        return  # فقط ادمین اجازه داره
+
+    text = update.message.text.strip()
+
+    # /broadcast پیام همگانی
+    if text.startswith("/broadcast "):
+        msg = text[len("/broadcast "):]
+        count = 0
+        for uid in users.keys():
+            try:
+                bot.send_message(chat_id=int(uid), text=msg)
+                count += 1
+            except:
+                continue
+        update.message.reply_text(f"📢 Message sent to {count} users.")
+
+    # /addtoall اضافه‌کردن به همه
+    elif text.startswith("/addtoall "):
         try:
-            amount = float(text)
-            if amount < MIN_BET:
-                await update.message.reply_text(f"❌ Minimum bet is {MIN_BET} TON.")
-                return
-            if users[user_id]["balance"] < amount:
-                await update.message.reply_text("❌ Not enough balance.")
-                return
+            amount = float(text.split()[1])
+            for u in users.values():
+                u['balance'] += amount
+            save_users(users)
+            update.message.reply_text(f"✅ Added {amount} TON to all users.")
+        except:
+            update.message.reply_text("❌ Invalid format. Use: /addtoall 0.1")
 
-            bet_type = current_bet_type[user_id]
-            users[user_id]["balance"] -= amount
-
-            if bet_type in ["bet_odd", "bet_even"]:
-                roll = random.randint(1, 6)
-                await update.message.reply_dice(emoji="🎲")
-                await asyncio.sleep(3)
-                result_type = "bet_odd" if roll % 2 != 0 else "bet_even"
-                if result_type == bet_type:
-                    win = round(amount * 1.5, 2)
-                    users[user_id]["balance"] += win
-                    await update.message.reply_text(f"🎲 Rolled: {roll}\n✅ You won {win} TON!")
-                else:
-                    await update.message.reply_text(f"🎲 Rolled: {roll}\n❌ You lost.")
-            elif bet_type.startswith("bet_pair_"):
-                roll1 = random.randint(1, 6)
-                roll2 = random.randint(1, 6)
-                await update.message.reply_dice(emoji="🎲")
-                await update.message.reply_dice(emoji="🎲")
-                await asyncio.sleep(3)
-                _, _, x, y = bet_type.split("_")
-                if str(roll1) == x and str(roll2) == y:
-                    win = round(amount * 3, 2)
-                    users[user_id]["balance"] += win
-                    await update.message.reply_text(f"🎲 Rolled: {roll1}-{roll2}\n✅ You won {win} TON!")
-                else:
-                    await update.message.reply_text(f"🎲 Rolled: {roll1}-{roll2}\n❌ You lost.")
+    # /add <user_id> <amount>
+    elif text.startswith("/add "):
+        try:
+            _, uid, amount = text.split()
+            uid = str(int(uid))
+            amount = float(amount)
+            if uid in users:
+                users[uid]['balance'] += amount
+                save_users(users)
+                update.message.reply_text(f"✅ Added {amount} TON to user {uid}")
             else:
-                await update.message.reply_text("❌ Invalid bet type.")
+                update.message.reply_text("❌ User not found.")
         except:
-            await update.message.reply_text("❌ Invalid amount.")
-        awaiting_bet_amount.pop(user_id, None)
-        current_bet_type.pop(user_id, None)
-        save_users()
-
-# ====== ادمین ======
-async def admin_add_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    try:
-        amt = float(context.args[0])
-        for user in users.values():
-            user["balance"] += amt
-        save_users()
-        await update.message.reply_text(f"✅ {amt} TON added to all users.")
-    except:
-        await update.message.reply_text("❌ Usage: /addtoall 0.1")
-
-async def admin_list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    await update.message.reply_text(f"👥 Total users: {len(users)}")
-
-async def admin_add_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    try:
-        target_id = context.args[0]
-        amt = float(context.args[1])
-        if target_id in users:
-            users[target_id]["balance"] += amt
-            save_users()
-            await update.message.reply_text(f"✅ Added {amt} TON to {target_id}.")
-        else:
-            await update.message.reply_text("❌ User not found.")
-    except:
-        await update.message.reply_text("❌ Usage: /adduser 123456789 0.5")
-
-async def admin_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    msg = " ".join(context.args)
-    success = 0
-    for uid in users.keys():
-        try:
-            await context.bot.send_message(chat_id=int(uid), text=msg)
-            success += 1
-        except:
-            continue
-    await update.message.reply_text(f"✅ Message sent to {success} users.")
-
-# ========== RUN ==========
-def main():
-    app = Application.builder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(handle_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    # Admin Commands
-    app.add_handler(CommandHandler("addtoall", admin_add_all))
-    app.add_handler(CommandHandler("users", admin_list_users))
-    app.add_handler(CommandHandler("adduser", admin_add_user))
-    app.add_handler(CommandHandler("broadcast", admin_broadcast))
-
-    Thread(target=run_flask).start()
-    app.run_polling()
-
-# ========== FLASK for Render ==========
-flask_app = Flask(__name__)
-
-@flask_app.route('/')
-def index():
-    return "Bot is running."
-
-def run_flask():
-    flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-if __name__ == '__main__':
-    main()
-
+            update.message.reply_text("❌ Invalid format. Use: /add <user_id> <amount>")
+            
+dispatcher.add_handler(CommandHandler("start", start))
+dispatcher.add_handler(CallbackQueryHandler(button))
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text))  # 👈 اضافه کن اینو
