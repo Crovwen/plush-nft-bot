@@ -220,6 +220,34 @@ async def add_to_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_users(users)
     await update.message.reply_text(f"✅ Added {amt} TON to all users.")
 
+async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    lines = []
+    for uid, udata in users.items():
+        lines.append(f"ID: {uid}, Username: @{udata.get('username', 'N/A')}, Balance: {udata.get('balance', 0):.2f}")
+    text = "\n".join(lines) or "No users found."
+    await update.message.reply_text(text)
+
+async def add_ton_to_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    if len(context.args) != 2:
+        await update.message.reply_text("Usage: /addton <user_id> <amount>")
+        return
+    user_id = context.args[0]
+    try:
+        amount = float(context.args[1])
+    except:
+        await update.message.reply_text("Invalid amount.")
+        return
+    if user_id not in users:
+        await update.message.reply_text("User not found.")
+        return
+    users[user_id]["balance"] += amount
+    save_users(users)
+    await update.message.reply_text(f"Added {amount} TON to user {user_id}.")
+
 # Flask server for Render
 app = Flask(__name__)
 @app.route('/')
@@ -235,3 +263,6 @@ if __name__ == '__main__':
     app_telegram.add_handler(CommandHandler("addtoall", add_to_all))
     app_telegram.add_handler(CallbackQueryHandler(handle_callback))
     app_telegram.run_polling()
+    app_telegram.add_handler(CommandHandler("listusers", list_users))
+    app_telegram.add_handler(CommandHandler("addton", add_ton_to_user))
+    
