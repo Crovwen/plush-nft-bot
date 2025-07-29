@@ -14,7 +14,6 @@ ADMIN_ID = 5095867558
 DEPOSIT_WALLET_ADDRESS = "UQAG_02lalmnQiisR-fbZLLSr861phEtyIrnWEUc7OwfxX5Y"
 DAILY_BONUS_AMOUNT = 0.08
 REFERRAL_REWARD = 0.05
-ADD_TO_ALL_AMOUNT = 0.1
 USERS_FILE = "users.json"
 
 NFT_LIST = [
@@ -137,6 +136,37 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["bet_type"] = query.data
         await context.bot.send_message(chat_id=user_id, text="💸 Enter your bet amount:")
 
+    elif query.data == "ton_withdrawal":
+        await query.edit_message_text("💸 TON Withdrawal:\nChoose amount to withdraw:", reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("0.5 TON", callback_data="wd_0.5"), InlineKeyboardButton("1 TON", callback_data="wd_1")],
+            [InlineKeyboardButton("2 TON", callback_data="wd_2"), InlineKeyboardButton("5 TON", callback_data="wd_5")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="withdrawal")]
+        ]))
+
+    elif query.data.startswith("wd_"):
+        amount = float(query.data.split("_")[1])
+        if user["balance"] >= amount:
+            context.user_data["withdraw_amount"] = amount
+            await context.bot.send_message(chat_id=user_id, text="📮 Enter your TON wallet address:")
+        else:
+            await context.bot.send_message(chat_id=user_id, text="❌ Not enough balance.")
+
+    elif query.data == "nft_withdrawal":
+        buttons = [[InlineKeyboardButton(f"{name} - {price} TON", callback_data=f"nft_{id}_{price}")] for name, id, price in NFT_LIST]
+        buttons.append([InlineKeyboardButton("⬅️ Back", callback_data="withdrawal")])
+        await query.edit_message_text("🖼 Choose an NFT to withdraw:", reply_markup=InlineKeyboardMarkup(buttons))
+
+    elif query.data.startswith("nft_"):
+        parts = query.data.split("_")
+        nft_id = parts[1]
+        price = float(parts[2])
+        if user["balance"] >= price:
+            user["balance"] -= price
+            save_users(users)
+            await context.bot.send_message(chat_id=user_id, text="📨 Send your Telegram username (for NFT transfer):")
+        else:
+            await context.bot.send_message(chat_id=user_id, text="❌ Not enough balance.")
+
     elif query.data == "back":
         await query.edit_message_text("Choose an option 👇", reply_markup=get_main_menu())
 
@@ -176,6 +206,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(result)
         except:
             await update.message.reply_text("❗ Please enter a valid number.")
+
+    elif "withdraw_amount" in context.user_data:
+        address = update.message.text
+        amount = context.user_data.pop("withdraw_amount")
+        user["balance"] -= amount
+        save_users(users)
+        await update.message.reply_text(f"✅ {amount:.2f} TON will be sent to:\n{address}\n⏳ Please wait up to 24 hours.")
 
 # Admin commands
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
