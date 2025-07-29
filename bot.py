@@ -137,6 +137,52 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text("❌ Not enough balance for this NFT.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
+    elif query.data == "betting":
+        betting_text = "🎲 Choose your bet:\n- Odd (1,3,5) → 1.5x\n- Even (2,4,6) → 1.5x\n- Pairs (1-1 to 6-6) → 3x"
+        buttons = [
+            [InlineKeyboardButton("Odd", callback_data="bet_odd"), InlineKeyboardButton("Even", callback_data="bet_even")],
+        ]
+        for i in range(1, 7):
+            buttons.append([InlineKeyboardButton(f"{i}-{i}", callback_data=f"bet_pair_{i}")])
+        buttons.append([InlineKeyboardButton("⬅️ Back", callback_data="back")])
+        await query.edit_message_text(betting_text, reply_markup=InlineKeyboardMarkup(buttons))
+
+    elif query.data.startswith("bet_"):
+        bet_type = query.data.split("_")[1]
+        cost = 0.1
+        if user["balance"] < cost:
+            await query.edit_message_text("❌ Not enough balance to bet.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+            return
+
+        roll = random.randint(1, 6)
+        result_text = f"🎲 Rolled: {roll}\n"
+        won = False
+
+        if bet_type == "odd" and roll in [1, 3, 5]:
+            won = True
+            reward = cost * 1.5
+        elif bet_type == "even" and roll in [2, 4, 6]:
+            won = True
+            reward = cost * 1.5
+        elif bet_type == "pair":
+            await query.edit_message_text("Invalid pair format.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+            return
+        elif bet_type.startswith("pair"):
+            pair_num = int(query.data.split("_")[-1])
+            if roll == pair_num:
+                won = True
+                reward = cost * 3
+
+        if won:
+            user["balance"] += reward - cost
+            result_text += f"✅ You won {reward:.2f} TON!"
+        else:
+            user["balance"] -= cost
+            result_text += f"❌ You lost {cost:.2f} TON."
+
+        save_users(users)
+        await query.edit_message_text(result_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+
     elif query.data == "back":
         await query.edit_message_text("Choose an option 👇", reply_markup=get_main_menu())
 
@@ -178,4 +224,3 @@ if __name__ == '__main__':
     app_telegram.add_handler(CommandHandler("addtoall", add_to_all))
     app_telegram.add_handler(CallbackQueryHandler(handle_callback))
     app_telegram.run_polling()
-    
