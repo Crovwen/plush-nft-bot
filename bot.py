@@ -9,7 +9,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
 from threading import Thread
 
-TOKEN = "7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc"
+TOKEN = "توکن خودتو اینجا بذار"
 ADMIN_ID = 5095867558
 DEPOSIT_WALLET_ADDRESS = "UQAG_02lalmnQiisR-fbZLLSr861phEtyIrnWEUc7OwfxX5Y"
 DAILY_BONUS_AMOUNT = 0.08
@@ -109,204 +109,103 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             hours = remaining.seconds // 3600
             minutes = (remaining.seconds % 3600) // 60
             await query.edit_message_text(f"⏳ Come back in {hours}h {minutes}m for your next bonus.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
-
-    elif query.data == "withdrawal":
-        buttons = [
-            [InlineKeyboardButton("TON Withdrawal📤", callback_data="ton_withdrawal")],
-            [InlineKeyboardButton("NFT Withdrawal📤", callback_data="nft_withdrawal")],
+            elif query.data == "withdrawal":
+        keyboard = [
+            [InlineKeyboardButton("0.5 TON", callback_data="withdraw_ton_0.5")],
+            [InlineKeyboardButton("1 TON", callback_data="withdraw_ton_1")],
+            [InlineKeyboardButton("2 TON", callback_data="withdraw_ton_2")],
+            [InlineKeyboardButton("5 TON", callback_data="withdraw_ton_5")],
+            [InlineKeyboardButton("10 TON", callback_data="withdraw_ton_10")],
+            [InlineKeyboardButton("15 TON", callback_data="withdraw_ton_15")],
+            [InlineKeyboardButton("20 TON", callback_data="withdraw_ton_20")],
+            [InlineKeyboardButton("NFT Withdrawal 📤", callback_data="nft_withdraw")],
             [InlineKeyboardButton("⬅️ Back", callback_data="back")]
         ]
-        await query.edit_message_text("📤 Choose a withdrawal method:", reply_markup=InlineKeyboardMarkup(buttons))
+        await query.edit_message_text("📤 Choose withdrawal option:", reply_markup=InlineKeyboardMarkup(keyboard))
 
-    elif query.data == "betting":
-        explanation = (
-            "🎲 Choose a bet type:\n\n"
-            "🔹 *Odd (1,3,5)* or *Even (2,4,6)*: 1.5x reward\n"
-            "🔹 *Pairs (1-1 to 6-6)*: 3x reward\n"
-        )
-        buttons = [
-            [InlineKeyboardButton("Even (2,4,6)", callback_data="even"), InlineKeyboardButton("Odd (1,3,5)", callback_data="odd")],
-            [InlineKeyboardButton("1-1", callback_data="pair_1"), InlineKeyboardButton("2-2", callback_data="pair_2"), InlineKeyboardButton("3-3", callback_data="pair_3")],
-            [InlineKeyboardButton("4-4", callback_data="pair_4"), InlineKeyboardButton("5-5", callback_data="pair_5"), InlineKeyboardButton("6-6", callback_data="pair_6")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="back")]
-        ]
-        await query.edit_message_text(explanation, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
-
-    elif query.data in ["even", "odd"] or query.data.startswith("pair_"):
-        context.user_data["bet_type"] = query.data
-        await context.bot.send_message(chat_id=user_id, text="💸 Enter your bet amount:")
-
-    elif query.data == "ton_withdrawal":
-        await query.edit_message_text("💸 TON Withdrawal:\nChoose amount to withdraw:", reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("0.5 TON", callback_data="wd_0.5"), InlineKeyboardButton("1 TON", callback_data="wd_1")],
-            [InlineKeyboardButton("2 TON", callback_data="wd_2"), InlineKeyboardButton("5 TON", callback_data="wd_5")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="withdrawal")]
-        ]))
-
-    elif query.data.startswith("wd_"):
-        amount = float(query.data.split("_")[1])
+    elif query.data.startswith("withdraw_ton_"):
+        amount = float(query.data.split("_")[-1])
         if user["balance"] >= amount:
-            context.user_data["withdraw_amount"] = amount
-            await context.bot.send_message(chat_id=user_id, text="📮 Enter your TON wallet address:")
+            user["balance"] -= amount
+            save_users(users)
+            await query.edit_message_text(f"✅ {amount} TON withdrawal requested.\n⏳ You'll receive it within 24h.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
         else:
-            await context.bot.send_message(chat_id=user_id, text="❌ Not enough balance.")
+            await query.edit_message_text("❌ Insufficient balance.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
-    elif query.data == "nft_withdrawal":
-        buttons = [[InlineKeyboardButton(f"{name} - {price} TON", callback_data=f"nft_{id}_{price}")] for name, id, price in NFT_LIST]
-        buttons.append([InlineKeyboardButton("⬅️ Back", callback_data="withdrawal")])
-        await query.edit_message_text("🖼 Choose an NFT to withdraw:", reply_markup=InlineKeyboardMarkup(buttons))
+    elif query.data == "nft_withdraw":
+        text = "🎨 Choose an NFT to withdraw:\n\n"
+        for name, tag, price in NFT_LIST:
+            text += f"• {name} {tag} - {price} TON\n"
+        keyboard = [[InlineKeyboardButton(f"{name} {tag}", callback_data=f"nft_{tag.strip('#')}")] for name, tag, price in NFT_LIST]
+        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back")])
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif query.data.startswith("nft_"):
-        parts = query.data.split("_")
-        nft_id = parts[1]
-        price = float(parts[2])
-        if user["balance"] >= price:
-            user["balance"] -= price
-            save_users(users)
-            await context.bot.send_message(chat_id=user_id, text="📨 Send your Telegram username (for NFT transfer):")
-        else:
-            await context.bot.send_message(chat_id=user_id, text="❌ Not enough balance.")
+        tag = "#" + query.data.split("_")[1]
+        nft = next((n for n in NFT_LIST if n[1] == tag), None)
+        if nft:
+            name, tag, price = nft
+            if user["balance"] >= price:
+                user["balance"] -= price
+                save_users(users)
+                await query.edit_message_text(f"🎉 NFT `{name} {tag}` withdrawal requested.\nPlease reply with your Telegram @username for delivery.", parse_mode=\"Markdown\", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
+            else:
+                await query.edit_message_text("❌ Not enough balance for this NFT.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]]))
 
     elif query.data == "back":
         await query.edit_message_text("Choose an option 👇", reply_markup=get_main_menu())
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    user = users.get(user_id)
+    await update.message.reply_text("Please use the buttons below 👇", reply_markup=get_main_menu())
 
-    if "bet_type" in context.user_data:
-        try:
-            amount = float(update.message.text)
-            if amount > user["balance"]:
-                await update.message.reply_text("❌ Not enough balance.")
-                return
-            bet_type = context.user_data.pop("bet_type")
-            dice = random.randint(1, 6)
-            win = False
-            multiplier = 1.5 if bet_type in ["even", "odd"] else 3
-
-            if bet_type == "even" and dice % 2 == 0:
-                win = True
-            elif bet_type == "odd" and dice % 2 == 1:
-                win = True
-            elif bet_type.startswith("pair_"):
-                pair_num = int(bet_type.split("_")[1])
-                if dice == pair_num:
-                    win = True
-
-            if win:
-                reward = amount * multiplier
-                user["balance"] += reward
-                result = f"🎲 Dice rolled: {dice}\n🎉 You won {reward:.2f} TON!"
-            else:
-                user["balance"] -= amount
-                result = f"🎲 Dice rolled: {dice}\n❌ You lost {amount:.2f} TON."
-
-            save_users(users)
-            await update.message.reply_text(result)
-        except:
-            await update.message.reply_text("❗ Please enter a valid number.")
-
-    elif "withdraw_amount" in context.user_data:
-        address = update.message.text
-        amount = context.user_data.pop("withdraw_amount")
-        user["balance"] -= amount
-        save_users(users)
-        await update.message.reply_text(f"✅ {amount:.2f} TON will be sent to:\n{address}\n⏳ Please wait up to 24 hours.")
-
-# Admin commands
+# Admin Commands
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
-    message = " ".join(context.args)
-    for uid in users:
+    msg = update.message.text.split(' ', 1)[1] if len(update.message.text.split()) > 1 else ''
+    count = 0
+    for uid in users.keys():
         try:
-            await context.bot.send_message(chat_id=int(uid), text=message)
+            await context.bot.send_message(chat_id=int(uid), text=msg)
+            count += 1
         except:
-            pass
-    await update.message.reply_text("✅ Broadcast sent.")
+            continue
+    await update.message.reply_text(f"✅ Broadcast sent to {count} users.")
 
 async def add_to_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
-    try:
-        amount = float(context.args[0])
-        for user in users.values():
-            user["balance"] += amount
-        save_users(users)
-        await update.message.reply_text(f"✅ Added {amount} TON to all users.")
-    except:
-        await update.message.reply_text("❗ Usage: /addtoall [amount]")
+    amount = float(update.message.text.split(' ')[1]) if len(update.message.text.split()) > 1 else ADD_TO_ALL_AMOUNT
+    for uid in users:
+        users[uid]["balance"] += amount
+    save_users(users)
+    for uid in users:
+        try:
+            await context.bot.send_message(chat_id=int(uid), text=f"💸 Admin added {amount} TON to your balance!")
+        except:
+            continue
+    await update.message.reply_text("✅ Added to all users.")
 
-async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    await update.message.reply_text(f"👥 Total users: {len(users)}")
-
-async def get_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    try:
-        uid = context.args[0]
-        user = users.get(uid)
-        if user:
-            await update.message.reply_text(f"💰 User {uid} balance: {user['balance']:.2f} TON")
-        else:
-            await update.message.reply_text("❗ User not found.")
-    except:
-        await update.message.reply_text("❗ Usage: /balance [user_id]")
-
-async def set_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    try:
-        uid = context.args[0]
-        amount = float(context.args[1])
-        user = users.get(uid)
-        if user:
-            user["balance"] = amount
-            save_users(users)
-            await update.message.reply_text(f"✅ Set balance of {uid} to {amount} TON")
-        else:
-            await update.message.reply_text("❗ User not found.")
-    except:
-        await update.message.reply_text("❗ Usage: /setbalance [user_id] [amount]")
-
-# Flask for Render
+# Flask app for Render hosting
 app = Flask(__name__)
-@app.route("/")
-def home():
-    return "Bot is Alive ✅"
+@app.route('/')
+def index():
+    return "Bot is running."
 
-def run_flask():
-    app.run(host="0.0.0.0", port=10000)
-
-async def run_bot():
+# Run bot
+async def main():
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CommandHandler("addtoall", add_to_all))
-    application.add_handler(CommandHandler("stats", stats))
-    application.add_handler(CommandHandler("balance", get_balance))
-    application.add_handler(CommandHandler("setbalance", set_balance))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     await application.initialize()
     await application.start()
     await application.updater.start_polling()
+    await application.updater.idle()
 
-if __name__ == "__main__":
-    Thread(target=run_flask).start()
-
-    async def main():
-        await run_bot()
-
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    loop.create_task(main())
-    loop.run_forever()
+if __name__ == '__main__':
+    Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))).start()
+    asyncio.run(main())
