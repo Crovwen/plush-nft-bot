@@ -256,6 +256,14 @@ async def run_bot():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     await app.run_polling()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
+    from threading import Thread
     Thread(target=run_flask).start()
-    asyncio.run(run_bot()) 
+
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(run_bot())
+    except RuntimeError:
+        new_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(new_loop)
+        new_loop.run_until_complete(run_bot()) 
