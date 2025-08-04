@@ -2,3 +2,4 @@ python-telegram-bot
 flask
 pytz
 nest_asyncio
+python-dotenv
