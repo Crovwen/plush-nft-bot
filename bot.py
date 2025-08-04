@@ -9,7 +9,7 @@ from telegram.ext import (ApplicationBuilder, CommandHandler, CallbackQueryHandl
                           MessageHandler, ContextTypes, filters)
 
 load_dotenv()
-BOT_TOKEN = os.getenv("7593433447:AAGkPgNGsXx5bvJYQiea64HrCOGIiKOn2Pc")
+BOT_TOKEN = os.getenv("7593433447:AAGXQT4mTAJkKIiDPE7uNr1whDW4dFabbok")
 
 app = Flask(__name__)
 
