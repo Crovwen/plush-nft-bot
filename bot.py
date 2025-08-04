@@ -294,3 +294,31 @@ def admin_commands(update: Update, context: CallbackContext):
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(button))
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text))  # 👈 اضافه کن اینو
+
+from flask import Flask
+from threading import Thread
+import nest_asyncio
+import asyncio
+
+app_flask = Flask(__name__)
+
+@app_flask.route('/')
+def home():
+    return "Bot is running!"
+
+async def run_bot():
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    await application.updater.idle()
+
+def run_flask():
+    app_flask.run(host="0.0.0.0", port=10000)
+
+if __name__ == "__main__":
+    nest_asyncio.apply()
+    Thread(target=run_flask).start()
+    loop = asyncio.get_event_loop()
+    loop.create_task(run_bot())
+    loop.run_forever()
+    
