@@ -193,7 +193,7 @@ def button(update: Update, context: CallbackContext):
     reply_markup = InlineKeyboardMarkup(keyboard)
     query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
 
-    elif data.startswith("nft_"):
+elif data.startswith("nft_"):
     nft_prices = {
         "nft_desk_calendar": (1.3, "Desk Calendar #104863"),
         "nft_lol_pop": (1.3, "Lol Pop #24488"),
