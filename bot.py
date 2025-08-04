@@ -168,15 +168,15 @@ def button(update: Update, context: CallbackContext):
             query.edit_message_text("❌ Insufficient balance!", reply_markup=get_back_button())
 
     elif data == "withdraw_nft":
-    text = "🎨 *Available NFTs:*\n"
-    text += "• Desk Calendar #104863 = 1.3 TON\n"
-    text += "• Lol Pop #24488 = 1.3 TON\n"
-    text += "• B-day Candle #98618 = 1.5 TON\n"
-    text += "• Snake Box #48486 = 1.5 TON\n"
-    text += "• Candy Cane #19264 = 1.6 TON\n"
-    text += "• Snoop Dogg #299426 = 2 TON\n"
-    text += "• Ginger Cookie #89374 = 18.5 TON\n"
-    text += "• Jester Hat #91301 = 50 TON"
+            text = "🎨 *Available NFTs:*\n"
+            text += "• Desk Calendar #104863 = 1.3 TON\n"
+            text += "• Lol Pop #24488 = 1.3 TON\n"
+            text += "• B-day Candle #98618 = 1.5 TON\n"
+            text += "• Snake Box #48486 = 1.5 TON\n"
+            text += "• Candy Cane #19264 = 1.6 TON\n"
+            text += "• Snoop Dogg #299426 = 2 TON\n"
+            text += "• Ginger Cookie #89374 = 18.5 TON\n"
+            text += "• Jester Hat #91301 = 50 TON"
 
     keyboard = [
         [InlineKeyboardButton("Desk Calendar", callback_data="nft_desk_calendar")],
