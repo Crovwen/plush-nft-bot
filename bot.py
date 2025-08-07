@@ -147,8 +147,7 @@ async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("📥 Send your TON wallet address:")
 
     elif data == "nft":
-        text = "🎨 *Available NFTs:*
-"
+        text = "🎨 *Available NFTs:*"
         buttons = []
         for nft in NFTS:
             text += f"- {nft} ({NFT_COST} TON)\n"
