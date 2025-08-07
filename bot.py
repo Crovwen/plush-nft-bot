@@ -236,10 +236,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(result_text)
 
-import threading
-from flask import Flask
+import os
 import asyncio
+from flask import Flask
+from threading import Thread
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler,
+    ContextTypes, filters
+)
+# توابع ربات مثل start و handle_button و handle_message و ... رو هم ایمپورت کن
 
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 app = Flask(__name__)
 
 @app.route('/')
@@ -261,8 +269,12 @@ def start_bot():
     asyncio.run(run_bot())
 
 if __name__ == "__main__":
+    # فقط زمانی که روی Render هستی، همزمان bot و Flask رو اجرا کن
     if os.getenv("RENDER"):
-        threading.Thread(target=start_bot).start()
+        # اول Bot رو در یک Thread بدون signal handler اجرا کن
+        Thread(target=start_bot, daemon=True).start()
+        # بعد Flask رو اجرا کن
         app.run(host="0.0.0.0", port=10000)
     else:
+        # برای اجرا در لوکال، فقط خود bot رو اجرا کن
         asyncio.run(run_bot())
