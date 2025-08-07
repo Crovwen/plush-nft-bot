@@ -71,8 +71,10 @@ def subtract_balance(user_id, amount):
 
 # --- Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(">>> /start called")  # برای لاگ در render
     user = update.effective_user
     user_data = get_user_data(user)
+    
     ref_id = context.args[0] if context.args else None
     if ref_id and ref_id != str(user.id):
         ref_users = load_users()
@@ -80,6 +82,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ref_users[ref_id]["balance"] += 0.05
             ref_users[ref_id]["referrals"] += 1
             save_users(ref_users)
+    
+    # پیام خوش‌آمد ساده
+    await update.message.reply_text(
+    "Welcome to Plush NFT!\nUse the menu below 👇"
+) 
 
     keyboard = [[
         InlineKeyboardButton("💼 Profile", callback_data="profile"),
