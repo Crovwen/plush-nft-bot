@@ -16,7 +16,7 @@ from telegram.ext import (
 )
 
 load_dotenv()
-BOT_TOKEN = os.getenv("7593433447:AAGwnbTDr0qfQ1cRL90fcCra4_85xdWqyqY")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 WALLET_ADDRESS = "UQCqEq6fP4BO2Gn1BLgAe8L5gk0vnzpXAr-ZJd8eqA3v0x3o"
 NFTS = ["Lol Pop #24488", "Dark Smile #10572", "Skull Beast #38299"]
 NFT_COST = 1.0
