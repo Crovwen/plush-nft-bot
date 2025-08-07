@@ -229,29 +229,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(result_text)
 
+import threading
+from flask import Flask
 import asyncio
 
-def run():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(handle_button))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    loop.run_until_complete(application.initialize())
-    loop.run_until_complete(application.start())
-    loop.run_until_complete(application.updater.start_polling())
-    loop.run_until_complete(application.run_polling())
+app = Flask(__name__)
 
 @app.route('/')
 def index():
     return "Bot is running."
 
+async def run_bot():
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(handle_button))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    await application.run_polling()
+
+def start_bot():
+    asyncio.run(run_bot())
+
 if __name__ == "__main__":
     if os.getenv("RENDER"):
-        import threading
-        threading.Thread(target=run).start()
+        threading.Thread(target=start_bot).start()
+        app.run(host="0.0.0.0", port=10000)
     else:
-        run()
+        asyncio.run(run_bot())
