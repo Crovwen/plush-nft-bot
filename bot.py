@@ -242,18 +242,20 @@ async def run_bot():
 def index():
     return "Bot is running."
 
+def start_bot():
+    try:
+        asyncio.run(run_bot())
+    except RuntimeError as e:
+        if "event loop is running" in str(e).lower():
+            loop = asyncio.get_event_loop()
+            loop.create_task(run_bot())
+            loop.run_forever()
+        else:
+            raise
+
 if __name__ == "__main__":
     if os.getenv("RENDER"):
         import threading
-        threading.Thread(target=lambda: asyncio.run(run_bot())).start()
+        threading.Thread(target=start_bot).start()
     else:
-        import asyncio
-        try:
-            asyncio.run(run_bot())
-        except RuntimeError as e:
-            if "event loop is running" in str(e).lower():
-                loop = asyncio.get_event_loop()
-                loop.create_task(run_bot())
-                loop.run_forever()
-            else:
-                raise
+        start_bot()
