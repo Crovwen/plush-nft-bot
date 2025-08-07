@@ -229,33 +229,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(result_text)
 
-async def run_bot():
+def run():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(handle_button))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    await application.initialize()
-    await application.start()
-    await application.run_polling()
+
+    application.run_polling()  # بدون async، خودش هندل می‌کنه
 
 @app.route('/')
 def index():
     return "Bot is running."
 
-def start_bot():
-    try:
-        asyncio.run(run_bot())
-    except RuntimeError as e:
-        if "event loop is running" in str(e).lower():
-            loop = asyncio.get_event_loop()
-            loop.create_task(run_bot())
-            loop.run_forever()
-        else:
-            raise
-
 if __name__ == "__main__":
     if os.getenv("RENDER"):
         import threading
-        threading.Thread(target=start_bot).start()
+        threading.Thread(target=run).start()
     else:
-        start_bot()
+        run()
