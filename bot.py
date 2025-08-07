@@ -236,16 +236,24 @@ async def run_bot():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     await application.initialize()
     await application.start()
-    await application.updater.start_polling()
     await application.run_polling()
-
-if __name__ == "__main__":
-    asyncio.run(run_bot())
 
 @app.route('/')
 def index():
     return "Bot is running."
 
-if os.getenv("RENDER"):
-    import threading
-    threading.Thread(target=lambda: asyncio.run(run_bot())).start()
+if __name__ == "__main__":
+    if os.getenv("RENDER"):
+        import threading
+        threading.Thread(target=lambda: asyncio.run(run_bot())).start()
+    else:
+        import asyncio
+        try:
+            asyncio.run(run_bot())
+        except RuntimeError as e:
+            if "event loop is running" in str(e).lower():
+                loop = asyncio.get_event_loop()
+                loop.create_task(run_bot())
+                loop.run_forever()
+            else:
+                raise
